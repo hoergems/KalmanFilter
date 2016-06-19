@@ -187,6 +187,25 @@ void KalmanFilter::computeEstimatedCovariance(Eigen::MatrixXd &kalmanGain,
     estimatedCovariance = (I - KtH) * predictedCovariance;
 }
 
+void KalmanFilter::computeLGains(std::vector<Eigen::MatrixXd> &A, 
+		                         std::vector<Eigen::MatrixXd> &B, 
+		                         Eigen::MatrixXd &C, 
+		                         Eigen::MatrixXd &D,
+		                         std::vector<Eigen::MatrixXd> &gains) {
+	Eigen::MatrixXd S = C;
+	std::reverse(A.begin(), A.end());
+	std::reverse(B.begin(), B.end());
+	for (size_t i = 0; i < A.size(); i++) {		
+		Eigen::MatrixXd A_tr = A[i].transpose();
+		Eigen::MatrixXd B_tr = B[i].transpose();
+		Eigen::MatrixXd L = -(B_tr * S * B[i] + D).inverse() * B_tr * S * A[i];
+		gains.push_back(L);
+		S = C + A_tr * S * A[i] + A_tr * S * B[i] * L;
+	}
+	
+	std::reverse(gains.begin(), gains.end());	
+}
+
 BOOST_PYTHON_MODULE(libKalmanFilter) { 
 	using namespace boost::python;
 	

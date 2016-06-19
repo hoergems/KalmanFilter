@@ -49,18 +49,61 @@ if(PKG_CONFIG_FOUND)
     message("-- Eigen library dirs: ${EIGEN_LIBRARY_DIRS}")   
 endif()
 
+############################# LOAD ROBOTS #############################
+if(PKG_CONFIG_FOUND)    
+    pkg_check_modules(ROBOTS robots)
+    if(NOT ROBOTS_FOUND)
+       message(FATAL_ERROR "ROBOTS could not be found")
+    endif()
+    include_directories(${ROBOTS_INCLUDE_DIRS})
+    link_directories(${ROBOTS_LIBRARY_DIRS})     
+endif()
+
+############################# LOAD ROBOT_ENVIRONMENT #############################
+if(PKG_CONFIG_FOUND)    
+    pkg_check_modules(ROBOT_ENVIRONMENT robot_environment)
+    if(NOT ROBOTS_FOUND)
+       message(FATAL_ERROR "ROBOT_ENVIRONMENT could not be found")
+    endif()
+    include_directories(${ROBOT_ENVIRONMENT_INCLUDE_DIRS})
+    link_directories(${ROBOT_ENVIRONMENT_LIBRARY_DIRS})     
+endif()
+
+############################# LOAD FCL #############################
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(FCL fcl)
+    if(NOT FCL_FOUND)
+       message(FATAL_ERROR "FCL could not be found")
+    endif()
+    include_directories(${FCL_INCLUDE_DIRS})
+    link_directories(${FCL_LIBRARY_DIRS}) 
+    message("-- FCL LIB DIRS ${FCL_LIBRARY_DIRS}")    
+endif()
+
+
 add_library(KalmanFilter SHARED
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp)           
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp)
+            
+add_library(PathEvaluator SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/path_evaluator.cpp)           
 
 target_link_libraries (KalmanFilter                      
                        ${Boost_LIBRARIES}
                        ${PYTHON_LIBRARIES})
+                       
+target_link_libraries (PathEvaluator                     
+                       ${Boost_LIBRARIES}
+                       ${PYTHON_LIBRARIES}
+                       ${ROBOTS_LIBRARIES}
+                       ${ROBOT_ENVIRONMENT_LIBRARIES}
+                       ${FCL_LIBRARIES})
 
 set(pkg_conf_file_in "${CMAKE_CURRENT_SOURCE_DIR}/kalman_filter.pc.in")
 set(pkg_conf_file_out "${CMAKE_CURRENT_BINARY_DIR}/kalman_filter.pc")
 configure_file("${pkg_conf_file_in}" "${pkg_conf_file_out}" @ONLY)
 
 install(TARGETS KalmanFilter DESTINATION lib)
+install(TARGETS PathEvaluator DESTINATION lib)
 install(DIRECTORY ${INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hxx" PATTERN "*.hpp"
   PATTERN ".DS_Store" EXCLUDE

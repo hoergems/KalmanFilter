@@ -1,5 +1,5 @@
-#ifndef KINEMATICS_HPP_
-#define KINEMATICS_HPP_
+#ifndef _KALMAN_FILTER_HPP_
+#define _KALMAN_FILTER_HPP_
 
 #include <boost/python.hpp>
 #include <boost/python/suite/indexing/vector_indexing_suite.hpp>
@@ -73,6 +73,12 @@ public:
 			                        Eigen::MatrixXd &H,
 			                        Eigen::MatrixXd &predictedCovariance,
 			                        Eigen::MatrixXd &estimatedCovariance);
+	
+	void computeLGains(std::vector<Eigen::MatrixXd> &A, 
+			           std::vector<Eigen::MatrixXd> &B, 
+			           Eigen::MatrixXd &C, 
+			           Eigen::MatrixXd &D,
+			           std::vector<Eigen::MatrixXd> &gains);
 	
 	
 };
