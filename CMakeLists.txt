@@ -69,6 +69,16 @@ if(PKG_CONFIG_FOUND)
     link_directories(${ROBOT_ENVIRONMENT_LIBRARY_DIRS})     
 endif()
 
+############################# LOAD ROBOTS #############################
+if(PKG_CONFIG_FOUND)    
+    pkg_check_modules(PATH_PLANNER path_planner)
+    if(NOT PATH_PLANNER_FOUND)
+       message(FATAL_ERROR "PATH_PLANNER could not be found")
+    endif()
+    include_directories(${PATH_PLANNER_INCLUDE_DIRS})
+    link_directories(${PATH_PLANNER_LIBRARY_DIRS})     
+endif()
+
 ############################# LOAD FCL #############################
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(FCL fcl)
@@ -96,7 +106,8 @@ target_link_libraries (PathEvaluator
                        ${PYTHON_LIBRARIES}
                        ${ROBOTS_LIBRARIES}
                        ${ROBOT_ENVIRONMENT_LIBRARIES}
-                       ${FCL_LIBRARIES})
+                       ${FCL_LIBRARIES}
+                       ${PATH_PLANNER_LIBRARIES})
 
 set(pkg_conf_file_in "${CMAKE_CURRENT_SOURCE_DIR}/kalman_filter.pc.in")
 set(pkg_conf_file_out "${CMAKE_CURRENT_BINARY_DIR}/kalman_filter.pc")

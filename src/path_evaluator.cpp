@@ -229,4 +229,29 @@ void PathEvaluator::sampleValidStates(std::vector<double> &mean,
 	}
 }
 
+//Threading functions
+
+std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment) {
+	std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner = std::make_shared<shared::DynamicPathPlanner>(false);
+	
+	// Set it up here!!!
+	/**dynamic_path_planner->setup(robot_environment_, 
+			                    robot_environment_->getSimulationStepSize(),
+								robot_environment_->getControlDuration(),
+								"RRT");*/
+	dynamic_path_planner->setup(robot_environment, 
+				                0.001,
+							    0.033333,
+								"RRT");
+	dynamic_path_planner->setControlSampler("discrete");
+	std::vector<int> num_control_samples({1});
+	dynamic_path_planner->setNumControlSamples(num_control_samples);
+	dynamic_path_planner->setRRTGoalBias(0.05);
+	std::vector<int> min_max_control_duration({1, 4});
+	dynamic_path_planner->setMinMaxControlDuration(min_max_control_duration);
+	dynamic_path_planner->addIntermediateStates(true);
+			
+	return dynamic_path_planner;
+}
+
 }

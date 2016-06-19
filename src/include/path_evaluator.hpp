@@ -7,8 +7,11 @@
 #include "kalman_filter.hpp"
 #include <robot_environment/Obstacle.hpp>
 #include "fcl/collision_object.h"
+#include <path_planner/dynamic_path_planner.hpp>
 
 namespace shared {
+
+std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
 
 class PathEvaluator {
 public:
@@ -65,6 +68,8 @@ private:
 			               Eigen::MatrixXd &cov, 
 			               unsigned int num_samples,
 			               std::vector<std::vector<double>> &samples); 
+	
+	std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner();
 	
 };
 
