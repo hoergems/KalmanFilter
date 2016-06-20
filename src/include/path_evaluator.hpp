@@ -3,6 +3,8 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <boost/random.hpp>
+#include <boost/thread.hpp>
+#include <queue>
 #include <robot_environment/robot_environment.hpp>
 #include "kalman_filter.hpp"
 #include <robot_environment/Obstacle.hpp>
@@ -11,6 +13,26 @@
 
 namespace shared {
 
+struct PathEvaluationResult {
+	PathEvaluationResult() = default;
+	
+	~PathEvaluationResult();
+	
+	PathEvaluationResult(PathEvaluationResult& res) {
+		evaluated_path = res.evaluated_path;
+		path_objective = res.path_objective;
+	}
+	
+	PathEvaluationResult& operator=(PathEvaluationResult &other) {
+		evaluated_path = other.evaluated_path;
+		path_objective = other.path_objective;
+	}
+	
+	std::vector<std::vector<double>> evaluated_path;
+	
+	double path_objective;
+};
+
 std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
 
 class PathEvaluator {
@@ -18,6 +40,8 @@ public:
 	PathEvaluator();	
 	
 	void setRobotEnvironment(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
+	
+	void setDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPlanner> &dynamic_path_planner); 
 	
 	void getLinearModelMatrices(std::vector<std::vector<double>> &state_path,
 			                    std::vector<std::vector<double>> &control_path,
@@ -47,7 +71,23 @@ public:
 	
 	double setNumSamples(unsigned int &num_samples);
 	
+	void planAndEvaluatePaths(const std::vector<double> &start_state,
+			                  Eigen::MatrixXd &P_t,
+			                  unsigned int &current_step,
+			                  double &timeout, 
+			                  unsigned &num_threads);
+	
+	void eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue, 
+			         const std::vector<double> &start_state,
+			         Eigen::MatrixXd &P_t,
+			         unsigned int &current_step,
+			         double &planning_timeout);
+	
 private:
+	boost::mutex mtx_;
+	
+	std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner_;
+	
 	std::shared_ptr<shared::RobotEnvironment> robot_environment_;
 	
 	std::shared_ptr<shared::KalmanFilter> kalman_filter_;

@@ -69,7 +69,7 @@ if(PKG_CONFIG_FOUND)
     link_directories(${ROBOT_ENVIRONMENT_LIBRARY_DIRS})     
 endif()
 
-############################# LOAD ROBOTS #############################
+############################# LOAD PATH_PLANNER #############################
 if(PKG_CONFIG_FOUND)    
     pkg_check_modules(PATH_PLANNER path_planner)
     if(NOT PATH_PLANNER_FOUND)
@@ -92,16 +92,11 @@ endif()
 
 
 add_library(KalmanFilter SHARED
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp)
-            
-add_library(PathEvaluator SHARED
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp
             ${CMAKE_CURRENT_SOURCE_DIR}/src/path_evaluator.cpp)           
 
+
 target_link_libraries (KalmanFilter                      
-                       ${Boost_LIBRARIES}
-                       ${PYTHON_LIBRARIES})
-                       
-target_link_libraries (PathEvaluator                     
                        ${Boost_LIBRARIES}
                        ${PYTHON_LIBRARIES}
                        ${ROBOTS_LIBRARIES}
@@ -114,8 +109,7 @@ set(pkg_conf_file_out "${CMAKE_CURRENT_BINARY_DIR}/kalman_filter.pc")
 configure_file("${pkg_conf_file_in}" "${pkg_conf_file_out}" @ONLY)
 
 install(TARGETS KalmanFilter DESTINATION lib)
-install(TARGETS PathEvaluator DESTINATION lib)
-install(DIRECTORY ${INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+install(DIRECTORY ${INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kalman_filter
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hxx" PATTERN "*.hpp"
   PATTERN ".DS_Store" EXCLUDE
 )

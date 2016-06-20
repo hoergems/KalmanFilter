@@ -1,12 +1,24 @@
 #include "include/path_evaluator.hpp"
+#include <unistd.h>
 
 using std::cout;
 using std::endl;
 
 namespace shared {
 
+//Threading functions
+
+std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPlanner> &dynamic_path_planner,
+		                                                           std::shared_ptr<shared::RobotEnvironment> &robot_environment) {	
+	std::shared_ptr<shared::DynamicPathPlanner> new_dynamic_path_planner = 
+			std::make_shared<shared::DynamicPathPlanner>(dynamic_path_planner, robot_environment);
+	return new_dynamic_path_planner;
+}
+
+
 PathEvaluator::PathEvaluator():
 	robot_environment_(nullptr),
+	dynamic_path_planner_(nullptr),
 	kalman_filter_(),
 	C_(),
 	D_(),
@@ -25,6 +37,10 @@ double PathEvaluator::setNumSamples(unsigned int &num_samples) {
 
 void PathEvaluator::setRobotEnvironment(std::shared_ptr<shared::RobotEnvironment> &robot_environment) {
 	robot_environment_ = robot_environment;
+}
+
+void PathEvaluator::setDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPlanner> &dynamic_path_planner) {
+	dynamic_path_planner_ = dynamic_path_planner;
 }
 
 double PathEvaluator::setRewardModel(double &step_penalty, 
@@ -229,29 +245,66 @@ void PathEvaluator::sampleValidStates(std::vector<double> &mean,
 	}
 }
 
-//Threading functions
-
-std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment) {
-	std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner = std::make_shared<shared::DynamicPathPlanner>(false);
+void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state, 
+		                                 Eigen::MatrixXd &P_t,
+					                     unsigned int &current_step,
+		                                 double &timeout,		                                 
+		                                 unsigned int &num_threads) {	
+	std::queue<std::shared_ptr<shared::PathEvaluationResult>> queue;	
+	boost::thread_group eval_group;	
+	for (size_t i = 0; i < num_threads; i++) {
+		eval_group.add_thread(new boost::thread(&PathEvaluator::eval_thread, 
+				                                this, 
+				                                queue, 
+				                                start_state,
+				                                P_t,
+				                                current_step,
+				                                timeout));		
+	}
 	
-	// Set it up here!!!
-	/**dynamic_path_planner->setup(robot_environment_, 
-			                    robot_environment_->getSimulationStepSize(),
-								robot_environment_->getControlDuration(),
-								"RRT");*/
-	dynamic_path_planner->setup(robot_environment, 
-				                0.001,
-							    0.033333,
-								"RRT");
-	dynamic_path_planner->setControlSampler("discrete");
-	std::vector<int> num_control_samples({1});
-	dynamic_path_planner->setNumControlSamples(num_control_samples);
-	dynamic_path_planner->setRRTGoalBias(0.05);
-	std::vector<int> min_max_control_duration({1, 4});
-	dynamic_path_planner->setMinMaxControlDuration(min_max_control_duration);
-	dynamic_path_planner->addIntermediateStates(true);
+	sleep(timeout);
+	eval_group.interrupt_all();
+}
+
+void PathEvaluator::eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue,		                        
+		                        const std::vector<double> &start_state,
+		                        Eigen::MatrixXd &P_t,
+		                        unsigned int &current_step,
+		                        double &planning_timeout) {
+	// Construct the dynamic path planner
+	std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner =
+			shared::makeDynamicPathPlanner(dynamic_path_planner_, robot_environment_);
+	if (!dynamic_path_planner) {
+		cout << "dynamic_path planner is NULL!!!" << endl;
+	}
+	
+	else {
+		cout << dynamic_path_planner << endl;
+	}
+	
+	while (true) {
+		try {
+			//construct a path
+			cout << "plan..." << endl;	
+			std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, planning_timeout);
+			cout << "solution found: " << solution.size() << endl;
+			//evaluate it
+			/**double objective = evaluatePath(solution[0], 
+					                        solution[1], 
+					                        solution[2],
+					                        solution[3],
+					                        P_t,
+					                        current_step);*/
+			//put result in the queue
+			mtx_.lock();
+					
+			mtx_.unlock();	
+			usleep(100000);
 			
-	return dynamic_path_planner;
+		}
+		catch (boost::thread_interrupted&) {					
+		}
+	}
 }
 
 }
