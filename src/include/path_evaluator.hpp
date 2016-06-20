@@ -10,6 +10,7 @@
 #include <robot_environment/Obstacle.hpp>
 #include "fcl/collision_object.h"
 #include <path_planner/dynamic_path_planner.hpp>
+#include <path_planner/Options.hpp>
 
 namespace shared {
 
@@ -71,17 +72,19 @@ public:
 	
 	double setNumSamples(unsigned int &num_samples);
 	
-	void planAndEvaluatePaths(const std::vector<double> &start_state,
+	void planAndEvaluatePaths(const std::vector<double> &start_state,			                 
 			                  Eigen::MatrixXd &P_t,
 			                  unsigned int &current_step,
 			                  double &timeout, 
-			                  unsigned &num_threads);
+			                  unsigned &num_threads,
+							  std::shared_ptr<shared::PathPlannerOptions> &path_planner_options);
 	
-	void eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue, 
+	void eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue,
 			         const std::vector<double> &start_state,
 			         Eigen::MatrixXd &P_t,
 			         unsigned int &current_step,
-			         double &planning_timeout);
+			         double &planning_timeout,
+					 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options);
 	
 private:
 	boost::mutex mtx_;

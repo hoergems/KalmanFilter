@@ -1,5 +1,6 @@
 #include "include/path_evaluator.hpp"
 #include <unistd.h>
+#include <memory>
 
 using std::cout;
 using std::endl;
@@ -8,11 +9,26 @@ namespace shared {
 
 //Threading functions
 
-std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPlanner> &dynamic_path_planner,
-		                                                           std::shared_ptr<shared::RobotEnvironment> &robot_environment) {	
-	std::shared_ptr<shared::DynamicPathPlanner> new_dynamic_path_planner = 
-			std::make_shared<shared::DynamicPathPlanner>(dynamic_path_planner, robot_environment);
-	return new_dynamic_path_planner;
+std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment,
+																   std::shared_ptr<shared::PathPlannerOptions> &options) {
+	std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone();	
+	std::unique_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));			
+	dyn->setup(env, options->planning_algorithm);	
+	ompl::base::GoalPtr goal_region = 
+				shared::makeManipulatorGoalRegion(dyn->getSpaceInformation(),
+				                                  env,
+				                                  options->goal_states,
+				                                  static_cast<shared::ManipulatorPathPlannerOptions *>(options.get())->ee_goal_position,
+				                                  options->goal_radius);
+	
+	dyn->setGoal(goal_region);
+	dyn->setControlSampler(options->control_sampler);
+	dyn->addIntermediateStates(options->addIntermediateStates);
+	dyn->setNumControlSamples(options->numControlSamples);
+	dyn->setRRTGoalBias(options->RRTGoalBias);
+	dyn->setMinMaxControlDuration(options->min_max_control_durations);
+	
+	return dyn;
 }
 
 
@@ -249,7 +265,8 @@ void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state,
 		                                 Eigen::MatrixXd &P_t,
 					                     unsigned int &current_step,
 		                                 double &timeout,		                                 
-		                                 unsigned int &num_threads) {	
+		                                 unsigned int &num_threads,
+										 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {	
 	std::queue<std::shared_ptr<shared::PathEvaluationResult>> queue;	
 	boost::thread_group eval_group;	
 	for (size_t i = 0; i < num_threads; i++) {
@@ -259,7 +276,8 @@ void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state,
 				                                start_state,
 				                                P_t,
 				                                current_step,
-				                                timeout));		
+				                                timeout,
+												path_planner_options));		
 	}
 	
 	sleep(timeout);
@@ -270,24 +288,19 @@ void PathEvaluator::eval_thread(std::queue<std::shared_ptr<shared::PathEvaluatio
 		                        const std::vector<double> &start_state,
 		                        Eigen::MatrixXd &P_t,
 		                        unsigned int &current_step,
-		                        double &planning_timeout) {
-	// Construct the dynamic path planner
-	std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner =
-			shared::makeDynamicPathPlanner(dynamic_path_planner_, robot_environment_);
-	if (!dynamic_path_planner) {
-		cout << "dynamic_path planner is NULL!!!" << endl;
-	}
-	
-	else {
-		cout << dynamic_path_planner << endl;
-	}
-	
+		                        double &planning_timeout,
+								std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {
+	std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;
+			
 	while (true) {
 		try {
+			//dynamic_path_planner = nullptr;
+			dynamic_path_planner = shared::makeDynamicPathPlanner(robot_environment_, path_planner_options);	
 			//construct a path
 			cout << "plan..." << endl;	
 			std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, planning_timeout);
 			cout << "solution found: " << solution.size() << endl;
+			
 			//evaluate it
 			/**double objective = evaluatePath(solution[0], 
 					                        solution[1], 
@@ -298,8 +311,7 @@ void PathEvaluator::eval_thread(std::queue<std::shared_ptr<shared::PathEvaluatio
 			//put result in the queue
 			mtx_.lock();
 					
-			mtx_.unlock();	
-			usleep(100000);
+			mtx_.unlock();			
 			
 		}
 		catch (boost::thread_interrupted&) {					
