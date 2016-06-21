@@ -221,9 +221,7 @@ double PathEvaluator::getExpectedStateReward(std::vector<double> &state, Eigen::
 		}		
 		
 	}
-	//double return_val = expected_state_reward / float(num_samples_);
-	//cout << "return val: " << return_val << endl;
-	//sleep(1);
+	
 	return expected_state_reward / float(num_samples_);
 }
 
@@ -255,16 +253,16 @@ void PathEvaluator::sampleValidStates(std::vector<double> &mean,
 	}
 }
 
-void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state, 
+bool PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state, 
 		                                 Eigen::MatrixXd &P_t,
 					                     unsigned int &current_step,
 		                                 double &timeout,		                                 
 		                                 unsigned int &num_threads,
-										 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {
+										 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options,
+										 std::shared_ptr<shared::PathEvaluationResult> &res) {
 	std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
-	//shared::MyQueue<std::shared_ptr<shared::PathEvaluationResult>> queue;	
 	boost::thread_group eval_group;	
-	for (size_t i = 0; i < num_threads; i++) {
+	for (size_t i = 0; i < num_threads; i++) {		
 		eval_group.add_thread(new boost::thread(&PathEvaluator::eval_thread, 
 				                                this, 
 				                                queue_ptr, 
@@ -272,12 +270,24 @@ void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state,
 				                                P_t,
 				                                current_step,
 				                                timeout,
-												path_planner_options));		
+												path_planner_options));	
 	}
 	
-	sleep(timeout);
+	sleep(timeout);	
 	eval_group.interrupt_all();
-	cout << "queue size: " << queue_ptr->size() << endl;
+	double best_objective = -1000000;
+	unsigned int queue_size = queue_ptr->size();
+	for (size_t i = 0; i < queue_size; i++) {
+		std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();
+		if (next_queue_elem->path_objective > best_objective) {
+			best_objective = next_queue_elem->path_objective;
+			res = std::make_shared<shared::PathEvaluationResult>(*(next_queue_elem.get()));
+			res->path_objective = next_queue_elem->path_objective;
+			
+		}
+		
+		queue_ptr->pop();
+	}
 }
 
 void PathEvaluator::eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> &queue_ptr,		                        
@@ -291,11 +301,8 @@ void PathEvaluator::eval_thread(std::shared_ptr<std::queue<std::shared_ptr<share
 		try {			
 			dynamic_path_planner = shared::makeDynamicPathPlanner(robot_environment_, path_planner_options);	
 			
-			//construct a path
-			cout << "plan..." << endl;	
+			//construct a path			
 			std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, planning_timeout);
-			cout << "solution found: " << solution.size() << endl;
-			
 			if (solution.size() != 0) {
 				unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
 				unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
@@ -325,12 +332,14 @@ void PathEvaluator::eval_thread(std::shared_ptr<std::queue<std::shared_ptr<share
 				//Evaluate the solution
 				boost::timer t;				
 				double objective = evaluatePath(xs, us, control_durations, P_t, current_step);				
-				
+				shared::Trajectory trajectory;
+				trajectory.xs = xs;
+				trajectory.us = us;
+				trajectory.zs = zs;
+				trajectory.control_durations = control_durations;
 				std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
-				result->xs = xs;
-				result->us = us;
-				result->zs = zs;
-				result->control_durations = control_durations;
+				result->trajectory = trajectory;
+				
 				result->path_objective = objective;
 				mtx_.lock();				
 				queue_ptr->push(result);				

@@ -12,35 +12,27 @@
 #include "fcl/collision_object.h"
 #include <path_planner/dynamic_path_planner.hpp>
 #include <path_planner/Options.hpp>
+#include <path_planner/trajectory.hpp>
 
 namespace shared {
 
-struct PathEvaluationResult {
+class PathEvaluationResult {
+public:
 	PathEvaluationResult() = default;
 	
 	//~PathEvaluationResult();
 	
 	PathEvaluationResult(PathEvaluationResult& res) {
-		xs = res.xs;
-		us = res.us;
-		zs = res.zs;
-		control_durations = res.control_durations;		
+		trajectory = res.trajectory;
 		path_objective = res.path_objective;
 	}
 	
 	PathEvaluationResult& operator=(PathEvaluationResult &res) {
-		xs = res.xs;
-		us = res.us;
-		zs = res.zs;
-		control_durations = res.control_durations;
+		trajectory = res.trajectory;
 		path_objective = res.path_objective;
 	}
 	
-	std::vector<std::vector<double>> xs;
-	std::vector<std::vector<double>> us;
-	std::vector<std::vector<double>> zs;
-	
-	std::vector<double> control_durations;
+	shared::Trajectory trajectory;
 	
 	double path_objective;
 };
@@ -83,12 +75,13 @@ public:
 	
 	double setNumSamples(unsigned int &num_samples);
 	
-	void planAndEvaluatePaths(const std::vector<double> &start_state,			                 
-			                  Eigen::MatrixXd &P_t,
-			                  unsigned int &current_step,
-			                  double &timeout, 
-			                  unsigned &num_threads,
-							  std::shared_ptr<shared::PathPlannerOptions> &path_planner_options);
+	bool planAndEvaluatePaths(const std::vector<double> &start_state,			                 
+			                                                           Eigen::MatrixXd &P_t,
+			                                                           unsigned int &current_step,
+			                                                           double &timeout, 
+			                                                           unsigned &num_threads,
+							                                           std::shared_ptr<shared::PathPlannerOptions> &path_planner_options,
+							                                           std::shared_ptr<shared::PathEvaluationResult> &res);
 	
 	void eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> &queue,
 			         const std::vector<double> &start_state,
