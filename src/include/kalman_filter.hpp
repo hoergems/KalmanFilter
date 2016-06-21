@@ -78,6 +78,7 @@ public:
 			           std::vector<Eigen::MatrixXd> &B, 
 			           Eigen::MatrixXd &C, 
 			           Eigen::MatrixXd &D,
+			           unsigned int &horizon,
 			           std::vector<Eigen::MatrixXd> &gains);
 	
 	

@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
+#include <boost/timer.hpp>
 #include <queue>
 #include <robot_environment/robot_environment.hpp>
 #include "kalman_filter.hpp"
@@ -17,19 +18,29 @@ namespace shared {
 struct PathEvaluationResult {
 	PathEvaluationResult() = default;
 	
-	~PathEvaluationResult();
+	//~PathEvaluationResult();
 	
 	PathEvaluationResult(PathEvaluationResult& res) {
-		evaluated_path = res.evaluated_path;
+		xs = res.xs;
+		us = res.us;
+		zs = res.zs;
+		control_durations = res.control_durations;		
 		path_objective = res.path_objective;
 	}
 	
-	PathEvaluationResult& operator=(PathEvaluationResult &other) {
-		evaluated_path = other.evaluated_path;
-		path_objective = other.path_objective;
+	PathEvaluationResult& operator=(PathEvaluationResult &res) {
+		xs = res.xs;
+		us = res.us;
+		zs = res.zs;
+		control_durations = res.control_durations;
+		path_objective = res.path_objective;
 	}
 	
-	std::vector<std::vector<double>> evaluated_path;
+	std::vector<std::vector<double>> xs;
+	std::vector<std::vector<double>> us;
+	std::vector<std::vector<double>> zs;
+	
+	std::vector<double> control_durations;
 	
 	double path_objective;
 };
@@ -65,10 +76,10 @@ public:
                         Eigen::MatrixXd &P_t,
                         unsigned int &current_step);
 	
-	double setRewardModel(double &step_penalty, 
-			              double &illegal_move_penalty, 
-			              double &terminal_reward, 
-			              double &discount_factor);
+	void setRewardModel(double &step_penalty, 
+			            double &illegal_move_penalty, 
+			            double &terminal_reward, 
+			            double &discount_factor);
 	
 	double setNumSamples(unsigned int &num_samples);
 	
@@ -79,7 +90,7 @@ public:
 			                  unsigned &num_threads,
 							  std::shared_ptr<shared::PathPlannerOptions> &path_planner_options);
 	
-	void eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue,
+	void eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> &queue,
 			         const std::vector<double> &start_state,
 			         Eigen::MatrixXd &P_t,
 			         unsigned int &current_step,

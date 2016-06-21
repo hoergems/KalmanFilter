@@ -59,14 +59,14 @@ void PathEvaluator::setDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPla
 	dynamic_path_planner_ = dynamic_path_planner;
 }
 
-double PathEvaluator::setRewardModel(double &step_penalty, 
+void PathEvaluator::setRewardModel(double &step_penalty, 
 			                         double &illegal_move_penalty, 
 			                         double &terminal_reward, 
-			                         double &discount_factor) {
+			                         double &discount_factor) {	
 	step_penalty_ = step_penalty;
-	illegal_move_penalty = illegal_move_penalty_;
-	terminal_reward_ = terminal_reward_;
-	discount_factor_ = discount_factor_;
+	illegal_move_penalty = illegal_move_penalty;
+	terminal_reward_ = terminal_reward;
+	discount_factor_ = discount_factor;
 }
 
 void PathEvaluator::getLinearModelMatrices(std::vector<std::vector<double>> &state_path,
@@ -90,13 +90,13 @@ void PathEvaluator::getLinearModelMatrices(std::vector<std::vector<double>> &sta
 		Ws.push_back(A_B_V_H_W[4]);
 		
 		Eigen::MatrixXd M;
-		robot_environment_->getRobot()->getStateCovarianceMatrix(M);
+		robot_environment_->getRobot()->getStateCovarianceMatrix(M);		
 		Ms.push_back(M);
 		
 		Eigen::MatrixXd N;
-		robot_environment_->getRobot()->getObservationCovarianceMatrix(N);
+		robot_environment_->getRobot()->getObservationCovarianceMatrix(N);		
 		Ns.push_back(N);
-	}
+	}	
 	
 }
 
@@ -130,63 +130,54 @@ double PathEvaluator::evaluatePath(std::vector<std::vector<double>> &state_path,
 			               Ms,
 			               Hs,
 			               Ws,
-			               Ns);
+			               Ns);	
 	double path_reward = 0.0;
 	unsigned int horizon_L = state_path.size();
 	std::vector<Eigen::MatrixXd> Ls;
-	kalman_filter_->computeLGains(As, Bs, C_, D_, Ls);
-	Eigen::MatrixXd Q_t_up(Ms[0].rows(), Ms[0].cols() + Ns[0].cols());
-	Eigen::MatrixXd Q_t_down(Ns[0].rows(), Ms[0].cols() + Ns[0].cols());
-	Eigen::MatrixXd Q_t_up_right = Eigen::MatrixXd::Zero(Ms[0].rows(), Ns[0].cols());
-	Eigen::MatrixXd Q_t_down_left = Eigen::MatrixXd::Zero(Ns[0].rows(), Ms[0].cols());
-	Q_t_up << Ms[0], Q_t_up_right;
-	Q_t_down << Q_t_down_left, Ns[0];
-	Eigen::MatrixXd Q_t(Q_t_up.rows() + Q_t_down.rows(), Q_t_up.cols());
+	unsigned int hor = horizon_L - 1;
+	kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls);	
+	Eigen::MatrixXd Q_t_up(Ms[0].rows(), Ms[0].cols() + Ns[0].cols());	
+	Eigen::MatrixXd Q_t_down(Ns[0].rows(), Ms[0].cols() + Ns[0].cols());	
+	Eigen::MatrixXd Q_t_up_right = Eigen::MatrixXd::Zero(Ms[0].rows(), Ns[0].cols());	
+	Eigen::MatrixXd Q_t_down_left = Eigen::MatrixXd::Zero(Ns[0].rows(), Ms[0].cols());	
+	Q_t_up << Ms[0], Q_t_up_right;	
+	Q_t_down << Q_t_down_left, Ns[0];	
+	Eigen::MatrixXd Q_t(Q_t_up.rows() + Q_t_down.rows(), Q_t_up.cols());	
 	Q_t << Q_t_up,
-		   Q_t_down;
-	
+		   Q_t_down;	
 	Eigen::MatrixXd R_t_up_right = Eigen::MatrixXd::Zero(P_t.rows(), P_t.cols());
-	Eigen::MatrixXd R_t_up(P_t.rows(), 2 * P_t.cols());
-	Eigen::MatrixXd R_t_down(P_t.rows(), 2 * P_t.cols());
-	R_t_up << P_t, R_t_up_right;
-	R_t_down << R_t_up_right, P_t;
+	Eigen::MatrixXd R_t_up(P_t.rows(), 2 * P_t.cols());	
+	Eigen::MatrixXd R_t_down(P_t.rows(), 2 * P_t.cols());	
+	R_t_up << P_t, R_t_up_right;	
+	R_t_down << R_t_up_right, P_t;	
 	Eigen::MatrixXd R_t(2 * P_t.rows(), 2 * P_t.cols());
 	R_t << R_t_up,
-		   R_t_down;
-	
+		   R_t_down;	
 	for (size_t i = 1; i < horizon_L; i++) {
-		Eigen::MatrixXd P_hat_t;		 
-		kalman_filter_->computePredictedCovariance(As[i], P_t, Vs[i], Ms[i], P_hat_t);
+		Eigen::MatrixXd P_hat_t;		
+		kalman_filter_->computePredictedCovariance(As[i], P_t, Vs[i], Ms[i], P_hat_t);		
 		Eigen::MatrixXd K_t;
 		kalman_filter_->computeKalmanGain(Hs[i], P_hat_t, Ws[i], Ns[i], K_t);		
-		kalman_filter_->computeEstimatedCovariance(K_t, Hs[i], P_hat_t, P_t);
-		
-		Eigen::MatrixXd F_u_l(As[i]);		
-		Eigen::MatrixXd F_u_r(As[i] * Ls[i - 1]);
-		Eigen::MatrixXd F_l_l(K_t * Hs[i] * As[i]);
-		Eigen::MatrixXd F_l_r(As[i] + Bs[i] * Ls[i - 1] - K_t * Hs[i] * As[i]);
-		
-		Eigen::MatrixXd F_t(F_u_l.rows() + F_l_l.rows(), F_u_l.cols() + F_u_r.cols());
-		F_t << F_u_l, F_u_r,
-			   F_l_l, F_l_r;
-		
-		Eigen::MatrixXd G_u_l(Vs[i]);
-		Eigen::MatrixXd G_l_l(K_t * Hs[i] * Vs[i]);
-		Eigen::MatrixXd G_l_r(K_t * Ws[i]);
-		Eigen::MatrixXd G_u_r = MatrixXd::Zero(G_u_l.rows(), G_l_r.cols());
-		Eigen::MatrixXd G_t(G_u_l.rows() + G_l_l.rows(), G_u_l.cols() + G_u_r.cols());
-		G_t << G_u_l, G_u_r,
-			   G_l_l, G_l_r;
-		
-		R_t = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();
-		
+		kalman_filter_->computeEstimatedCovariance(K_t, Hs[i], P_hat_t, P_t);		
+		Eigen::MatrixXd BL(Bs[i] * Ls[i - 1]);
+		Eigen::MatrixXd KHA(K_t * Hs[i] * As[i]);
+		Eigen::MatrixXd F_l_r(As[i] + BL - KHA);		
+		Eigen::MatrixXd F_t(As[i].rows() + KHA.rows(), As[i].cols() + BL.cols());		
+		F_t << As[i], BL,
+			   KHA, F_l_r;		
+		Eigen::MatrixXd KHV(K_t * Hs[i] * Vs[i]);		
+		Eigen::MatrixXd KW(K_t * Ws[i]);		
+		Eigen::MatrixXd G_u_r = MatrixXd::Zero(Vs[i].rows(), KW.cols());
+		Eigen::MatrixXd G_t(Vs[i].rows() + KHV.rows(), Vs[i].cols() + G_u_r.cols());
+		G_t << Vs[i], G_u_r,
+			   KHV, KW;		
+		R_t = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();		
 		Eigen::MatrixXd Gamma_t_u_l = Eigen::MatrixXd::Identity(Ls[i - 1].rows(), Ls[i - 1].cols());
 		Eigen::MatrixXd Gamma_t_u_r = Eigen::MatrixXd::Zero(Gamma_t_u_l.rows(), Ls[i - 1].cols());
-		Eigen::MatrixXd Gamma_t_l_l = Eigen::MatrixXd::Zero(Ls[i - 1].rows(), Gamma_t_u_l.cols());
-		Eigen::MatrixXd Gamma_t_l_r(Ls[i - 1]);
+		Eigen::MatrixXd Gamma_t_l_l = Eigen::MatrixXd::Zero(Ls[i - 1].rows(), Gamma_t_u_l.cols());		
 		Eigen::MatrixXd Gamma_t(Gamma_t_u_l.rows() + Gamma_t_l_l.rows(), Gamma_t_u_l.cols() + Gamma_t_u_r.cols());
 		Gamma_t << Gamma_t_u_l, Gamma_t_u_r,
-				   Gamma_t_l_l, Gamma_t_l_r;
+				   Gamma_t_l_l, Ls[i - 1];
 		
 		Eigen::MatrixXd Cov(Gamma_t * R_t * Gamma_t.transpose());
 		Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));
@@ -197,20 +188,20 @@ double PathEvaluator::evaluatePath(std::vector<std::vector<double>> &state_path,
 	return path_reward;
 }
 
-double PathEvaluator::getExpectedStateReward(std::vector<double> &state, Eigen::MatrixXd &cov_state) {
+double PathEvaluator::getExpectedStateReward(std::vector<double> &state, Eigen::MatrixXd &cov_state) {	
 	double expected_state_reward = 0.0;
 	std::vector<std::vector<double>> state_samples;
-	sampleValidStates(state, cov_state, num_samples_, state_samples);
+	sampleValidStates(state, cov_state, num_samples_, state_samples);	
 	bool collides = false;
+	std::vector<std::shared_ptr<shared::Obstacle>> obstacles;	
+	robot_environment_->getObstacles(obstacles);	
 	for (size_t i = 0; i < num_samples_; i++) {
 		// Check for collision
-		std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;
-		robot_environment_->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);
-		std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
-		robot_environment_->getObstacles(obstacles);
-		collides = false;
-		for (size_t j = 0; j < obstacles.size(); i++) { 
-			if (!obstacles[j]->getTerrain()->isTraversable()) {
+		std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;		
+		robot_environment_->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);		
+		collides = false;			
+		for (size_t j = 0; j < obstacles.size(); j++) { 
+			if (!obstacles[j]->getTerrain()->isTraversable()) {				
 				if (obstacles[j]->in_collision(collision_objects)) {
 					expected_state_reward -= illegal_move_penalty_;
 					collides = true;
@@ -219,17 +210,20 @@ double PathEvaluator::getExpectedStateReward(std::vector<double> &state, Eigen::
 			}
 		}
 		
-		if (!collides) {
-			if (robot_environment_->getRobot()->isTerminal(state_samples[i])) {
+		if (!collides) {			
+			if (robot_environment_->getRobot()->isTerminal(state_samples[i])) {								
 				expected_state_reward += terminal_reward_;
 			}
 			
 			else {
 				expected_state_reward -= step_penalty_;
-			}
-		}
+			}			
+		}		
 		
 	}
+	//double return_val = expected_state_reward / float(num_samples_);
+	//cout << "return val: " << return_val << endl;
+	//sleep(1);
 	return expected_state_reward / float(num_samples_);
 }
 
@@ -266,13 +260,14 @@ void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state,
 					                     unsigned int &current_step,
 		                                 double &timeout,		                                 
 		                                 unsigned int &num_threads,
-										 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {	
-	std::queue<std::shared_ptr<shared::PathEvaluationResult>> queue;	
+										 std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {
+	std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
+	//shared::MyQueue<std::shared_ptr<shared::PathEvaluationResult>> queue;	
 	boost::thread_group eval_group;	
 	for (size_t i = 0; i < num_threads; i++) {
 		eval_group.add_thread(new boost::thread(&PathEvaluator::eval_thread, 
 				                                this, 
-				                                queue, 
+				                                queue_ptr, 
 				                                start_state,
 				                                P_t,
 				                                current_step,
@@ -282,38 +277,67 @@ void PathEvaluator::planAndEvaluatePaths(const std::vector<double> &start_state,
 	
 	sleep(timeout);
 	eval_group.interrupt_all();
+	cout << "queue size: " << queue_ptr->size() << endl;
 }
 
-void PathEvaluator::eval_thread(std::queue<std::shared_ptr<shared::PathEvaluationResult>> &queue,		                        
+void PathEvaluator::eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> &queue_ptr,		                        
 		                        const std::vector<double> &start_state,
 		                        Eigen::MatrixXd &P_t,
 		                        unsigned int &current_step,
 		                        double &planning_timeout,
 								std::shared_ptr<shared::PathPlannerOptions> &path_planner_options) {
-	std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;
-			
+	std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;			
 	while (true) {
-		try {
-			//dynamic_path_planner = nullptr;
+		try {			
 			dynamic_path_planner = shared::makeDynamicPathPlanner(robot_environment_, path_planner_options);	
+			
 			//construct a path
 			cout << "plan..." << endl;	
 			std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, planning_timeout);
 			cout << "solution found: " << solution.size() << endl;
 			
-			//evaluate it
-			/**double objective = evaluatePath(solution[0], 
-					                        solution[1], 
-					                        solution[2],
-					                        solution[3],
-					                        P_t,
-					                        current_step);*/
-			//put result in the queue
-			mtx_.lock();
+			if (solution.size() != 0) {
+				unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
+				unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
+				std::vector<std::vector<double>> xs;
+				std::vector<std::vector<double>> us;
+				std::vector<std::vector<double>> zs;
+				std::vector<double> control_durations;
+				for (size_t i = 0; i < solution.size(); i++) {
+					std::vector<double> x_elem;
+					std::vector<double> u_elem;
+					std::vector<double> z_elem;
+					for (size_t j = 0; j < state_space_dimension; j++) {
+						x_elem.push_back(solution[i][j]);
+						if (j < control_space_dimension) {
+							u_elem.push_back(solution[i][state_space_dimension + j]);
+						}
+						
+						z_elem.push_back(solution[i][state_space_dimension + control_space_dimension + j]);
+					}
 					
-			mtx_.unlock();			
-			
+					control_durations.push_back(solution[i][2 * state_space_dimension + control_space_dimension]);
+					xs.push_back(x_elem);
+					us.push_back(u_elem);
+					zs.push_back(z_elem);
+				}
+				
+				//Evaluate the solution
+				boost::timer t;				
+				double objective = evaluatePath(xs, us, control_durations, P_t, current_step);				
+				
+				std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
+				result->xs = xs;
+				result->us = us;
+				result->zs = zs;
+				result->control_durations = control_durations;
+				result->path_objective = objective;
+				mtx_.lock();				
+				queue_ptr->push(result);				
+				mtx_.unlock();
+			}
 		}
+		
 		catch (boost::thread_interrupted&) {					
 		}
 	}

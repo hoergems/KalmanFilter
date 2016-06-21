@@ -154,7 +154,7 @@ void KalmanFilter::computePredictedCovariance(Eigen::MatrixXd &A,
 			                                  Eigen::MatrixXd &P_t,
 			                                  Eigen::MatrixXd &V,
 			                                  Eigen::MatrixXd &M,
-			                                  Eigen::MatrixXd &predictedCovariance) {
+			                                  Eigen::MatrixXd &predictedCovariance) {	
 	predictedCovariance = A * (P_t * A.transpose()) + (V * M) * V.transpose();
 }
 
@@ -191,16 +191,19 @@ void KalmanFilter::computeLGains(std::vector<Eigen::MatrixXd> &A,
 		                         std::vector<Eigen::MatrixXd> &B, 
 		                         Eigen::MatrixXd &C, 
 		                         Eigen::MatrixXd &D,
+		                         unsigned int &horizon,
 		                         std::vector<Eigen::MatrixXd> &gains) {
-	Eigen::MatrixXd S = C;
-	std::reverse(A.begin(), A.end());
-	std::reverse(B.begin(), B.end());
-	for (size_t i = 0; i < A.size(); i++) {		
-		Eigen::MatrixXd A_tr = A[i].transpose();
-		Eigen::MatrixXd B_tr = B[i].transpose();
-		Eigen::MatrixXd L = -(B_tr * S * B[i] + D).inverse() * B_tr * S * A[i];
+	Eigen::MatrixXd S(C);
+	std::vector<Eigen::MatrixXd> As(A);
+	std::vector<Eigen::MatrixXd> Bs(B);
+	std::reverse(As.begin(), As.end());
+	std::reverse(Bs.begin(), Bs.end());
+	for (size_t i = 0; i < horizon; i++) {		
+		Eigen::MatrixXd A_tr = As[i].transpose();
+		Eigen::MatrixXd B_tr = Bs[i].transpose();
+		Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
 		gains.push_back(L);
-		S = C + A_tr * S * A[i] + A_tr * S * B[i] * L;
+		S = C + A_tr * S * As[i] + A_tr * S * Bs[i] * L;
 	}
 	
 	std::reverse(gains.begin(), gains.end());	
