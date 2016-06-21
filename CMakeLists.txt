@@ -26,18 +26,6 @@ if(PKG_CONFIG_FOUND)
     link_directories(${PYTHON_LIBRARY_DIRS})    
 endif()
 
-
-############################# LOAD BOOST #############################
-find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS python system thread timer)
-if (NOT Boost_FOUND)
-    set(Boost_INCLUDE_DIRS "${BOOST_INCLUDE_DIRS}")
-    IF ( NOT Boost_INCLUDE_DIRS )
-        message(FATAL_ERROR "Please point the environment variable BOOST_INCLUDE_DIRS to the include directory of Boost")
-    ENDIF()
-endif ()
-include_directories(${Boost_INCLUDE_DIRS})
-link_directories(${Boost_LIBRARY_DIRS})
-
 ############################# LOAD EIGEN #############################
 if(PKG_CONFIG_FOUND)
     pkg_check_modules(EIGEN eigen3)
@@ -91,24 +79,23 @@ if(PKG_CONFIG_FOUND)
 endif()
 
 
-add_library(KalmanFilter SHARED
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/path_evaluator.cpp)           
+#add_library(KalmanFilter SHARED
+#            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp)           
 
 
-target_link_libraries (KalmanFilter                      
-                       ${Boost_LIBRARIES}
-                       ${PYTHON_LIBRARIES}
-                       ${ROBOTS_LIBRARIES}
-                       ${ROBOT_ENVIRONMENT_LIBRARIES}
-                       ${FCL_LIBRARIES}
-                       ${PATH_PLANNER_LIBRARIES})
+#target_link_libraries (KalmanFilter                      
+#                       ${Boost_LIBRARIES}
+#                       ${PYTHON_LIBRARIES}
+#                       ${ROBOTS_LIBRARIES}
+#                       ${ROBOT_ENVIRONMENT_LIBRARIES}
+#                       ${FCL_LIBRARIES}
+#                       ${PATH_PLANNER_LIBRARIES})
 
 set(pkg_conf_file_in "${CMAKE_CURRENT_SOURCE_DIR}/kalman_filter.pc.in")
 set(pkg_conf_file_out "${CMAKE_CURRENT_BINARY_DIR}/kalman_filter.pc")
 configure_file("${pkg_conf_file_in}" "${pkg_conf_file_out}" @ONLY)
 
-install(TARGETS KalmanFilter DESTINATION lib)
+#install(TARGETS KalmanFilter DESTINATION lib)
 install(DIRECTORY ${INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kalman_filter
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hxx" PATTERN "*.hpp"
   PATTERN ".DS_Store" EXCLUDE
