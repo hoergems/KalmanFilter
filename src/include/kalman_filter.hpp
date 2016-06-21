@@ -10,16 +10,19 @@ class KalmanFilter {
 public:
 	KalmanFilter();
 	
-	void kalmanPredict(Eigen::VectorXd &x, 
-			           Eigen::VectorXd &u,
+	void kalmanPredict(std::vector<double> &x, 
+			           std::vector<double> &u,
 			           Eigen::MatrixXd &A,
 			           Eigen::MatrixXd &B,
 			           Eigen::MatrixXd &P_t,
 			           Eigen::MatrixXd &V,
 			           Eigen::MatrixXd &M,
-			           Eigen::VectorXd &x_predicted,
+			           std::vector<double> &x_predicted,
 			           Eigen::MatrixXd &P_predicted) {
-		x_predicted = A * x + B * u;	
+		Eigen::VectorXd x_e = utils::toEigenVec(x);
+		Eigen::VectorXd u_e = utils::toEigenVec(u);
+		Eigen::VectorXd x_predicted_e = A * x_e + B * u_e;
+		x_predicted = utils::toStdVec(x_predicted_e);	
 		computePredictedCovariance(A, P_t, V, M, P_predicted);
 	}
 	
@@ -120,6 +123,7 @@ public:
 			control_error.push_back(0.0);
 		}
 		
+		std::vector<double> x_predicted_new;
 		env->getRobot()->propagateState(x_estimated, 
 				                        u, 
 				                        control_error, 
@@ -127,15 +131,13 @@ public:
 				                        simulation_step_size,
 				                        x_predicted);		
 		
-		Eigen::VectorXd x = utils::toEigenVec(x_predicted);
-		Eigen::VectorXd u_e = utils::toEigenVec(u);	
+		std::vector<double> dummy;
+		//Eigen::VectorXd x = utils::toEigenVec(x_predicted);
+		//Eigen::VectorXd u_e = utils::toEigenVec(u);	
 		
-		Eigen::VectorXd x_predicted_e;		
-		kalmanPredict(x, u_e, A, B, P_t, V, M, x_predicted_e, P_predicted);
-		x_predicted = utils::toStdVec(x_predicted_e);		
-		
+		//Eigen::VectorXd x_predicted_e;		
+		kalmanPredict(x_predicted, u, A, B, P_t, V, M, dummy, P_predicted);
 	}
-	
 };
 
 }

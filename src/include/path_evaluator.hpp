@@ -166,6 +166,121 @@ public:
 		D_ = D;
 	}
 	
+	void adjustAndEvaluatePath(shared::Trajectory &trajectory,
+			                   std::vector<double> &x_estimated,
+			                   Eigen::MatrixXd &P_t,
+			                   unsigned int &current_step,
+			                   std::shared_ptr<shared::PathEvaluationResult> &res) {
+		std::vector<std::vector<double>> xs;
+		std::vector<std::vector<double>> us;
+		std::vector<double> control_durations;
+		for (size_t i = 1; i < trajectory.xs.size(); i++) {
+			xs.push_back(trajectory.xs[i]);
+			us.push_back(trajectory.us[i]);
+			control_durations.push_back(trajectory.control_durations[i]);
+		}
+		Eigen::MatrixXd P_t_n(P_t);
+		std::vector<Eigen::MatrixXd> As;
+		std::vector<Eigen::MatrixXd> Bs;
+		std::vector<Eigen::MatrixXd> Vs;
+		std::vector<Eigen::MatrixXd> Ms;
+		std::vector<Eigen::MatrixXd> Hs;
+		std::vector<Eigen::MatrixXd> Ws;
+		std::vector<Eigen::MatrixXd> Ns;
+		getLinearModelMatrices(trajectory.xs,
+				               trajectory.us,
+				               trajectory.control_durations,
+				               As,
+				               Bs,
+				               Vs,
+				               Ms,
+				               Hs,
+				               Ws,
+				               Ns);
+		std::vector<Eigen::MatrixXd> Ls;
+		unsigned int hor = xs.size() - 1;
+		kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls);
+		
+		shared::Trajectory adjusted_trajectory;
+		adjusted_trajectory.xs.push_back(trajectory.xs[0]);
+		adjusted_trajectory.zs.push_back(trajectory.zs[0]);
+		
+		std::vector<double> x_tilde = utils::subtractVectors(x_estimated, trajectory.xs[0]);
+		for (size_t i = 0; i < xs.size() - 1; i++) {			
+			std::vector<double> x_predicted = xs[i];			
+			VectorXd x_e_minus_p(x_predicted.size());			
+			for (size_t j = 0; j < x_predicted.size(); j++) {				
+				x_e_minus_p(j) = x_estimated[j] - x_predicted[j];
+			}
+			
+			Eigen::VectorXd us_i = utils::toEigenVec(us[i]);			
+			Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;			
+			std::vector<double> u_vec = utils::toStdVec(u);
+			robot_environment_->getRobot()->enforceControlConstraints(u_vec);			
+			std::vector<double> control_error;
+			for (size_t j = 0; j < u_vec.size(); j++) {
+				control_error.push_back(0.0);
+			}
+			
+			std::vector<double> res;
+			robot_environment_->getRobot()->propagateState(xs[i],
+					                                       u_vec,
+					                                       control_error,
+					                                       control_durations[i],
+					                                       options_->simulation_step_size,
+					                                       res);
+			adjusted_trajectory.xs.push_back(res);
+			adjusted_trajectory.us.push_back(u_vec);
+			adjusted_trajectory.zs.push_back(res);
+			
+			std::vector<double> u_dash = utils::subtractVectors(u_vec, us[i]);
+			
+			//Kalman prediction and update
+			std::vector<double> x_tilde_dash_t;
+			std::vector<double> x_tilde_estimated;
+			std::vector<double> z_dash;			
+			kalman_filter_->kalmanPredict(x_tilde, 
+					                      u_dash,
+					                      As[i],
+					                      Bs[i],
+					                      P_t,
+					                      Vs[i],
+					                      Ms[i],
+					                      x_tilde_dash_t,
+					                      P_t_n);
+			for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
+				z_dash.push_back(0.0);
+			}
+			Eigen::MatrixXd estimated_cov;			
+			kalman_filter_->kalmanUpdate(x_tilde_dash_t,
+					                     z_dash,
+					                     Hs[i],
+					                     P_t_n,
+					                     Ws[i],
+					                     Ns[i],
+					                     x_tilde_estimated,
+					                     estimated_cov);
+			P_t_n = estimated_cov;
+			x_estimated = utils::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
+			
+		}
+		std::vector<double> ze;
+		for (size_t i = 0; i < trajectory.us[0].size(); i++) {
+			ze.push_back(0.0);
+		}
+		adjusted_trajectory.us.push_back(ze);
+		adjusted_trajectory.control_durations.push_back(0.0);
+		
+		double objective = evaluatePath(adjusted_trajectory.xs,
+				                        adjusted_trajectory.us,
+				                        adjusted_trajectory.control_durations,
+				                        P_t,
+				                        current_step);
+		res = std::make_shared<shared::PathEvaluationResult>();
+		res->trajectory = adjusted_trajectory;
+		res->path_objective = objective;
+	}
+	
 	double evaluatePath(std::vector<std::vector<double>> &state_path,
                         std::vector<std::vector<double>> &control_path,
                         std::vector<double> &control_durations,
