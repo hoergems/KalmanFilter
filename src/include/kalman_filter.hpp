@@ -1,6 +1,8 @@
 #ifndef _KALMAN_FILTER_HPP_
 #define _KALMAN_FILTER_HPP_
 #include <Eigen/Dense>
+#include <robot_environment/robot_environment.hpp>
+#include "utils.hpp"
 
 namespace shared {
 
@@ -22,15 +24,16 @@ public:
 	}
 	
 	
-	void kalmanUpdate(Eigen::VectorXd &x_predicted,
-			          Eigen::VectorXd &z,
+	void kalmanUpdate(std::vector<double> &x_predicted,
+			          std::vector<double> &z,
 			          Eigen::MatrixXd &H,
 			          Eigen::MatrixXd &predictedCovariance,
 			          Eigen::MatrixXd &W,
 			          Eigen::MatrixXd &N,
-			          Eigen::VectorXd &x_estimated,
+			          std::vector<double> &x_estimated,
 			          Eigen::MatrixXd &estimatedCovariance) {
-		const int size = x_predicted.rows();
+		x_estimated.clear();
+		const int size = x_predicted.size();
 		Eigen::MatrixXd kalmanGain(size, size);
 		computeKalmanGain(H, predictedCovariance, W, N, kalmanGain);	
 		computeStateEstimate(x_predicted, z, H, kalmanGain, x_estimated);
@@ -56,12 +59,15 @@ public:
 		kalmanGain = predictedCovariance * (H_transpose * (H * (predictedCovariance * H_transpose) + W * (N * W.transpose())).inverse());
 	}
 	
-	void computeStateEstimate(Eigen::VectorXd &x_predicted,
-			                  Eigen::VectorXd &z,
+	void computeStateEstimate(std::vector<double> &x_predicted,
+			                  std::vector<double> &z,
 			                  Eigen::MatrixXd &H,
 			                  Eigen::MatrixXd &kalmanGain,
-			                  Eigen::VectorXd &stateEstimate) {
-		stateEstimate = x_predicted + kalmanGain * (z - H * x_predicted);
+			                  std::vector<double> &stateEstimate) {
+		Eigen::VectorXd x_predicted_e = utils::toEigenVec(x_predicted);
+		Eigen::VectorXd z_e = utils::toEigenVec(z);	
+		Eigen::VectorXd stateEstimate_e = x_predicted_e + kalmanGain * (z_e - H * x_predicted_e);
+		stateEstimate = utils::toStdVec(stateEstimate_e);
 	}
 	
 	void computeEstimatedCovariance(Eigen::MatrixXd &kalmanGain,
@@ -96,6 +102,39 @@ public:
 		std::reverse(gains.begin(), gains.end());
 	}
 	
+	void ekfPredictState(std::shared_ptr<shared::RobotEnvironment> &env,
+			             std::vector<double> &x_estimated,
+			             std::vector<double> &u,
+			             double &control_duration,
+			             double &simulation_step_size,
+			             Eigen::MatrixXd &A,
+			             Eigen::MatrixXd &B,
+			             Eigen::MatrixXd &V,
+			             Eigen::MatrixXd &M,
+			             Eigen::MatrixXd &P_t,
+			             std::vector<double> &x_predicted,
+			             Eigen::MatrixXd &P_predicted) {
+		x_predicted.clear();
+		std::vector<double> control_error;
+		for (size_t i = 0; i < env->getRobot()->getControlSpaceDimension(); i++) {
+			control_error.push_back(0.0);
+		}
+		
+		env->getRobot()->propagateState(x_estimated, 
+				                        u, 
+				                        control_error, 
+				                        control_duration,
+				                        simulation_step_size,
+				                        x_predicted);		
+		
+		Eigen::VectorXd x = utils::toEigenVec(x_predicted);
+		Eigen::VectorXd u_e = utils::toEigenVec(u);	
+		
+		Eigen::VectorXd x_predicted_e;		
+		kalmanPredict(x, u_e, A, B, P_t, V, M, x_predicted_e, P_predicted);
+		x_predicted = utils::toStdVec(x_predicted_e);		
+		
+	}
 	
 };
 

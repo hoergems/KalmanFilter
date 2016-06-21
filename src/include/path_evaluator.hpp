@@ -95,6 +95,29 @@ public:
 		dynamic_path_planner_ = dynamic_path_planner;
 	}
 	
+	std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::vector<double> &state,
+			                                                 std::vector<double> &control,
+			                                                 double control_duration) const {
+		std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
+		std::vector<Eigen::MatrixXd> A_B_V_H_W;
+		robot_environment_->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
+		A_B_V_H_W_M_N.push_back(A_B_V_H_W[0]);
+		A_B_V_H_W_M_N.push_back(A_B_V_H_W[1]);
+		A_B_V_H_W_M_N.push_back(A_B_V_H_W[2]);
+		A_B_V_H_W_M_N.push_back(A_B_V_H_W[3]);
+		A_B_V_H_W_M_N.push_back(A_B_V_H_W[4]);
+		
+		Eigen::MatrixXd M;
+		robot_environment_->getRobot()->getStateCovarianceMatrix(M);
+		A_B_V_H_W_M_N.push_back(M);
+		
+		Eigen::MatrixXd N;
+		robot_environment_->getRobot()->getObservationCovarianceMatrix(N);
+		A_B_V_H_W_M_N.push_back(N);
+		
+		return A_B_V_H_W_M_N;
+	}
+	
 	void getLinearModelMatrices(std::vector<std::vector<double>> &state_path,
 			                    std::vector<std::vector<double>> &control_path,
 			                    std::vector<double> &control_durations,
@@ -105,9 +128,19 @@ public:
 			                    std::vector<Eigen::MatrixXd> &Hs,
 			                    std::vector<Eigen::MatrixXd> &Ws,
 			                    std::vector<Eigen::MatrixXd> &Ns) {
-		std::vector<Eigen::MatrixXd> A_B_V_H_W;
+		//std::vector<Eigen::MatrixXd> A_B_V_H_W;
 		for (size_t i = 0; i < state_path.size(); i++) {
-			A_B_V_H_W.clear();
+			std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(state_path[i], control_path[i], control_durations[i]);
+			
+			As.push_back(A_B_V_H_W_M_N[0]);
+			Bs.push_back(A_B_V_H_W_M_N[1]);
+			Vs.push_back(A_B_V_H_W_M_N[2]);
+			Hs.push_back(A_B_V_H_W_M_N[3]);
+			Ws.push_back(A_B_V_H_W_M_N[4]);
+			Ms.push_back(A_B_V_H_W_M_N[5]);
+			Ns.push_back(A_B_V_H_W_M_N[6]);
+			
+			/**A_B_V_H_W.clear();
 			robot_environment_->getRobot()->getLinearProcessMatrices(state_path[i], control_path[i], control_durations[i], A_B_V_H_W);
 			As.push_back(A_B_V_H_W[0]);
 			Bs.push_back(A_B_V_H_W[1]);
@@ -121,7 +154,7 @@ public:
 				
 			Eigen::MatrixXd N;
 			robot_environment_->getRobot()->getObservationCovarianceMatrix(N);		
-			Ns.push_back(N);
+			Ns.push_back(N);*/
 		}
 	}
 	
