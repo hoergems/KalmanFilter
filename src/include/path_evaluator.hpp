@@ -18,10 +18,10 @@
 
 namespace shared {
 
-template<class OptionsType>
+template<class RobotType, class OptionsType>
 std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment,
 																   std::shared_ptr<OptionsType> &options) {
-	std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone();	
+	std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();	
 	std::unique_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));			
 	dyn->setup(env, options->dynamic_planner);
 	std::vector<double> goal_area;
@@ -30,27 +30,22 @@ std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_p
 	double goal_radius = goal_area[3];
 	std::vector<std::vector<double>> goal_states = robot_environment->getGoalStates();
 	ompl::base::GoalPtr goal_region = 
-				shared::makeManipulatorGoalRegion(dyn->getSpaceInformation(),
-				                                  env,
-				                                  goal_states,
-				                                  goal_position,
-				                                  goal_radius);
+				shared::makeRobotGoalRegion(dyn->getSpaceInformation(),
+				                            env,
+				                            goal_states);
 	
 	dyn->setGoal(goal_region);
 	dyn->setControlSampler(options->control_sampler);
 	dyn->addIntermediateStates(options->add_intermediate_states);
 	dyn->setNumControlSamples(options->numControlSamples);
 	dyn->setRRTGoalBias(options->rrtGoalBias);
-	dyn->setMinMaxControlDuration(options->min_max_control_duration);
-	
+	dyn->setMinMaxControlDuration(options->min_max_control_duration);	
 	return dyn;
 }
 
 class PathEvaluationResult {
 public:
 	PathEvaluationResult() = default;
-	
-	//~PathEvaluationResult();
 	
 	PathEvaluationResult(PathEvaluationResult& res) {
 		trajectory = res.trajectory;
@@ -67,9 +62,9 @@ public:
 	double path_objective;
 };
 
-std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
+//std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
 
-template<class OptionsType>
+template<class RobotType, class OptionsType>
 class PathEvaluator {
 public:
 	PathEvaluator(std::shared_ptr<OptionsType> &options):
@@ -373,7 +368,7 @@ public:
 	
 	double setNumSamples(unsigned int &num_samples) {
 		num_samples_ = num_samples;
-	}	
+	}
 	
 	bool planAndEvaluatePaths(const std::vector<double> &start_state,			                 
 			                  Eigen::MatrixXd &P_t,
@@ -406,16 +401,17 @@ public:
 				
 				queue_ptr->pop();
 			}
-	}	
+	}
 	
 	void eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> &queue_ptr,
 			         const std::vector<double> &start_state,
 			         Eigen::MatrixXd &P_t,
 			         unsigned int &current_step) {
+		std::shared_ptr<OptionsType> ptr;
 		std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;			
 			while (true) {
 				try {			
-					dynamic_path_planner = shared::makeDynamicPathPlanner(robot_environment_, options_);	
+					dynamic_path_planner = shared::makeDynamicPathPlanner<RobotType, OptionsType>(robot_environment_, options_);	
 					
 					//construct a path			
 					std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, options_->stepTimeout);
