@@ -110,8 +110,7 @@ public:
 			             std::vector<double> &u,
 			             double &control_duration,
 			             double &simulation_step_size,
-			             Eigen::MatrixXd &A,
-			             Eigen::MatrixXd &B,
+			             Eigen::MatrixXd &A,			             
 			             Eigen::MatrixXd &V,
 			             Eigen::MatrixXd &M,
 			             Eigen::MatrixXd &P_t,
@@ -121,22 +120,34 @@ public:
 		std::vector<double> control_error;
 		for (size_t i = 0; i < env->getRobot()->getControlSpaceDimension(); i++) {
 			control_error.push_back(0.0);
+		}		
+		/**cout << "========================" << endl;
+		cout << "PREDICTION" << endl;
+		cout << "x_in: ";
+		for (auto &k: x_estimated) {
+			cout << k << ", ";
 		}
-		
-		std::vector<double> x_predicted_new;
+		cout << endl;
+		cout << "u_in: ";
+		for (auto &k: u) {
+			cout << k << ", ";
+		}
+		cout << endl;
+		cout << "control duration: " << control_duration << endl;
+		cout << "simulation step size: " << simulation_step_size << endl;*/
 		env->getRobot()->propagateState(x_estimated, 
 				                        u, 
 				                        control_error, 
 				                        control_duration,
 				                        simulation_step_size,
-				                        x_predicted);		
-		
-		std::vector<double> dummy;
-		//Eigen::VectorXd x = utils::toEigenVec(x_predicted);
-		//Eigen::VectorXd u_e = utils::toEigenVec(u);	
-		
-		//Eigen::VectorXd x_predicted_e;		
-		kalmanPredict(x_predicted, u, A, B, P_t, V, M, dummy, P_predicted);
+				                        x_predicted);
+		/**cout << "prediction result: ";
+		for (auto &k: x_predicted) {
+			cout << k << ", ";
+		}
+		cout << endl;
+		cout << "========================" << endl;*/
+		computePredictedCovariance(A, P_t, V, M, P_predicted);		
 	}
 };
 

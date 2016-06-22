@@ -5,13 +5,13 @@
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 #include <boost/timer.hpp>
+//#include <boost/date_time/posix_time/posix_time.hpp>
 #include <queue>
 #include <robot_environment/robot_environment.hpp>
 #include "kalman_filter.hpp"
 #include <robot_environment/Obstacle.hpp>
 #include "fcl/collision_object.h"
 #include <path_planner/dynamic_path_planner.hpp>
-#include <path_planner/Options.hpp>
 #include <path_planner/trajectory.hpp>
 #include <unistd.h>
 #include <memory>
@@ -166,6 +166,7 @@ public:
 			                   Eigen::MatrixXd &P_t,
 			                   unsigned int &current_step,
 			                   std::shared_ptr<shared::PathEvaluationResult> &res) {
+		std::vector<double> x_estimated_t = x_estimated;
 		std::vector<std::vector<double>> xs;
 		std::vector<std::vector<double>> us;
 		std::vector<double> control_durations;
@@ -198,14 +199,14 @@ public:
 		
 		shared::Trajectory adjusted_trajectory;
 		adjusted_trajectory.xs.push_back(trajectory.xs[0]);
-		adjusted_trajectory.zs.push_back(trajectory.zs[0]);
+		adjusted_trajectory.zs.push_back(trajectory.zs[0]);		
 		
-		std::vector<double> x_tilde = utils::subtractVectors(x_estimated, trajectory.xs[0]);
+		std::vector<double> x_tilde = utils::subtractVectors(x_estimated_t, trajectory.xs[0]);
 		for (size_t i = 0; i < xs.size() - 1; i++) {			
 			std::vector<double> x_predicted = xs[i];			
 			VectorXd x_e_minus_p(x_predicted.size());			
 			for (size_t j = 0; j < x_predicted.size(); j++) {				
-				x_e_minus_p(j) = x_estimated[j] - x_predicted[j];
+				x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
 			}
 			
 			Eigen::VectorXd us_i = utils::toEigenVec(us[i]);			
@@ -226,7 +227,7 @@ public:
 					                                       res);
 			adjusted_trajectory.xs.push_back(res);
 			adjusted_trajectory.us.push_back(u_vec);
-			adjusted_trajectory.zs.push_back(res);
+			adjusted_trajectory.zs.push_back(res);			
 			
 			std::vector<double> u_dash = utils::subtractVectors(u_vec, us[i]);
 			
@@ -256,7 +257,7 @@ public:
 					                     x_tilde_estimated,
 					                     estimated_cov);
 			P_t_n = estimated_cov;
-			x_estimated = utils::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
+			x_estimated_t = utils::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
 			
 		}
 		std::vector<double> ze;
@@ -264,7 +265,7 @@ public:
 			ze.push_back(0.0);
 		}
 		adjusted_trajectory.us.push_back(ze);
-		adjusted_trajectory.control_durations.push_back(0.0);
+		adjusted_trajectory.control_durations = control_durations;
 		
 		double objective = evaluatePath(adjusted_trajectory.xs,
 				                        adjusted_trajectory.us,
@@ -376,18 +377,31 @@ public:
 			                  unsigned &num_threads,							 
 							  std::shared_ptr<shared::PathEvaluationResult> &res) {
 		std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
-			boost::thread_group eval_group;	
-			for (size_t i = 0; i < num_threads; i++) {		
-				eval_group.add_thread(new boost::thread(&PathEvaluator::eval_thread, 
+		    std::vector<boost::thread> threads;
+			//boost::thread_group eval_group;	
+			for (size_t i = 0; i < num_threads; i++) {
+				threads.push_back(boost::thread(&PathEvaluator::eval_thread, 
+                        this, 
+                        queue_ptr, 
+                        start_state,
+                        P_t,
+                        current_step));
+				/**eval_group.add_thread(new boost::thread(&PathEvaluator::eval_thread, 
 						                                this, 
 						                                queue_ptr, 
 						                                start_state,
 						                                P_t,
-						                                current_step));	
+						                                current_step));*/	
+			}		
+			boost::posix_time::seconds(1.0);
+			for (auto &t: threads) {
+				t.timed_join(boost::posix_time::seconds(options_->stepTimeout));
 			}
-			
-			sleep(options_->stepTimeout);	
-			eval_group.interrupt_all();
+			/**sleep(options_->stepTimeout);
+			for (auto &t: threads) {
+				t.interrupt();
+			}*/
+			//eval_group.interrupt_all();			
 			double best_objective = -1000000;
 			unsigned int queue_size = queue_ptr->size();
 			for (size_t i = 0; i < queue_size; i++) {
@@ -411,10 +425,12 @@ public:
 		std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;			
 			while (true) {
 				try {			
+					boost::this_thread::interruption_point();
 					dynamic_path_planner = shared::makeDynamicPathPlanner<RobotType, OptionsType>(robot_environment_, options_);	
 					
-					//construct a path			
-					std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, options_->stepTimeout);
+					//construct a path	
+					boost::this_thread::interruption_point();
+					std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, options_->stepTimeout);					
 					if (solution.size() != 0) {
 						unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
 						unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
@@ -442,7 +458,8 @@ public:
 						}
 						
 						//Evaluate the solution
-						boost::timer t;				
+						boost::timer t;	
+						boost::this_thread::interruption_point();
 						double objective = evaluatePath(xs, us, control_durations, P_t, current_step);				
 						shared::Trajectory trajectory;
 						trajectory.xs = xs;
@@ -450,16 +467,18 @@ public:
 						trajectory.zs = zs;
 						trajectory.control_durations = control_durations;
 						std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
-						result->trajectory = trajectory;
-						
+						result->trajectory = trajectory;						
 						result->path_objective = objective;
+						boost::this_thread::interruption_point();
 						mtx_.lock();				
-						queue_ptr->push(result);				
+						queue_ptr->push(result);						
 						mtx_.unlock();
+						boost::this_thread::interruption_point();
 					}
 				}
 				
-				catch (boost::thread_interrupted&) {					
+				catch (boost::thread_interrupted&) {	
+					cout << "interrupted" << endl;
 				}
 			}
 	}
