@@ -22,66 +22,6 @@ void KalmanFilter::kalmanPredict(Eigen::VectorXd &x,
 	computePredictedCovariance(A, P_t, V, M, P_predicted);	
 }
 
-void KalmanFilter::kalmanPredictPy(std::vector<double> &x,
-			                       std::vector<double> &u,
-			                       std::vector<std::vector<double>> &A,
-			                       std::vector<std::vector<double>> &B,
-			                       std::vector<std::vector<double>> &P_t,
-			                       std::vector<std::vector<double>> &V,
-			                       std::vector<std::vector<double>> &M,
-			                       std::vector<double> &x_predicted,
-			                       std::vector<std::vector<double>> &P_predicted) {	
-	Eigen::VectorXd x_e(x.size());
-	Eigen::VectorXd u_e(u.size());
-	
-	for (size_t i = 0; i < x.size(); i++) {
-		x_e[i] = x[i];		
-	}
-	
-	for (size_t i = 0; i < u.size(); i++) {
-		u_e[i] = u[i];		
-	}
-	
-	Eigen::MatrixXd A_e(A.size(), A[0].size());
-	for (size_t i = 0; i < A.size(); i++) {
-		for (size_t j = 0; j < A[0].size(); j++) {
-			A_e(i, j) = A[i][j];
-		}
-	}
-	
-	Eigen::MatrixXd B_e(B.size(), B[0].size());
-	for (size_t i = 0; i < B.size(); i++) {
-		for (size_t j = 0; j < B[0].size(); j++) {
-			B_e(i, j) = B[i][j];
-		}
-	}
-	
-	Eigen::MatrixXd Pt_e(P_t.size(), P_t[0].size());
-	for (size_t i = 0; i < P_t.size(); i++) {
-		for (size_t j = 0; j < P_t[0].size(); j++) {
-			Pt_e(i, j) = P_t[i][j];
-		}
-	}
-	
-	Eigen::MatrixXd V_e(V.size(), V[0].size());
-	for (size_t i = 0; i < V.size(); i++) {
-		for (size_t j = 0; j < V[0].size(); j++) {
-			V_e(i, j) = V[i][j];
-		}
-	}
-	
-	Eigen::MatrixXd M_e(M.size(), M[0].size());
-	for (size_t i = 0; i < M.size(); i++) {
-		for (size_t j = 0; j < M[0].size(); j++) {
-			M_e(i, j) = M[i][j];
-		}
-	}
-	
-	Eigen::VectorXd x_predict(x.size());
-	Eigen::MatrixXd P_predict(P_t.size(), P_t[0].size());
-	kalmanPredict(x_e, u_e, A_e, B_e, Pt_e, V_e, M_e, x_predict, P_predict);	
-}
-
 void KalmanFilter::kalmanUpdate(Eigen::VectorXd &x_predicted,
 			                    Eigen::VectorXd &z,
 			                    Eigen::MatrixXd &H,

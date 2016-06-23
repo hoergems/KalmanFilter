@@ -1,7 +1,7 @@
 #ifndef _PATH_EVALUATOR_HPP_
 #define _PATH_EVALUATOR_HPP_
 #include <iostream>
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
 #include <boost/random.hpp>
 #include <boost/thread.hpp>
 #include <boost/timer.hpp>
@@ -201,7 +201,7 @@ public:
 		adjusted_trajectory.xs.push_back(trajectory.xs[0]);
 		adjusted_trajectory.zs.push_back(trajectory.zs[0]);		
 		
-		std::vector<double> x_tilde = utils::subtractVectors(x_estimated_t, trajectory.xs[0]);
+		std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, trajectory.xs[0]);
 		for (size_t i = 0; i < xs.size() - 1; i++) {			
 			std::vector<double> x_predicted = xs[i];			
 			VectorXd x_e_minus_p(x_predicted.size());			
@@ -209,9 +209,9 @@ public:
 				x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
 			}
 			
-			Eigen::VectorXd us_i = utils::toEigenVec(us[i]);			
+			Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);			
 			Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;			
-			std::vector<double> u_vec = utils::toStdVec(u);
+			std::vector<double> u_vec = utils_kalman::toStdVec(u);
 			robot_environment_->getRobot()->enforceControlConstraints(u_vec);			
 			std::vector<double> control_error;
 			for (size_t j = 0; j < u_vec.size(); j++) {
@@ -229,7 +229,7 @@ public:
 			adjusted_trajectory.us.push_back(u_vec);
 			adjusted_trajectory.zs.push_back(res);			
 			
-			std::vector<double> u_dash = utils::subtractVectors(u_vec, us[i]);
+			std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
 			
 			//Kalman prediction and update
 			std::vector<double> x_tilde_dash_t;
@@ -257,7 +257,7 @@ public:
 					                     x_tilde_estimated,
 					                     estimated_cov);
 			P_t_n = estimated_cov;
-			x_estimated_t = utils::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
+			x_estimated_t = utils_kalman::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
 			
 		}
 		std::vector<double> ze;

@@ -19,10 +19,10 @@ public:
 			           Eigen::MatrixXd &M,
 			           std::vector<double> &x_predicted,
 			           Eigen::MatrixXd &P_predicted) {
-		Eigen::VectorXd x_e = utils::toEigenVec(x);
-		Eigen::VectorXd u_e = utils::toEigenVec(u);
+		Eigen::VectorXd x_e = utils_kalman::toEigenVec(x);
+		Eigen::VectorXd u_e = utils_kalman::toEigenVec(u);
 		Eigen::VectorXd x_predicted_e = A * x_e + B * u_e;
-		x_predicted = utils::toStdVec(x_predicted_e);	
+		x_predicted = utils_kalman::toStdVec(x_predicted_e);	
 		computePredictedCovariance(A, P_t, V, M, P_predicted);
 	}
 	
@@ -67,10 +67,10 @@ public:
 			                  Eigen::MatrixXd &H,
 			                  Eigen::MatrixXd &kalmanGain,
 			                  std::vector<double> &stateEstimate) {
-		Eigen::VectorXd x_predicted_e = utils::toEigenVec(x_predicted);
-		Eigen::VectorXd z_e = utils::toEigenVec(z);	
+		Eigen::VectorXd x_predicted_e = utils_kalman::toEigenVec(x_predicted);
+		Eigen::VectorXd z_e = utils_kalman::toEigenVec(z);	
 		Eigen::VectorXd stateEstimate_e = x_predicted_e + kalmanGain * (z_e - H * x_predicted_e);
-		stateEstimate = utils::toStdVec(stateEstimate_e);
+		stateEstimate = utils_kalman::toStdVec(stateEstimate_e);
 	}
 	
 	void computeEstimatedCovariance(Eigen::MatrixXd &kalmanGain,

@@ -1,7 +1,7 @@
 #ifndef _UTILS_KALMAN_
 #define _UTILS_KALMAN_
 
-namespace utils {
+namespace utils_kalman {
 
 Eigen::VectorXd toEigenVec(std::vector<double> &vec) {	
 	Eigen::Map<Eigen::VectorXd> e_vec(vec.data(), vec.size());	
