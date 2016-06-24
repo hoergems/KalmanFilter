@@ -62,6 +62,8 @@ public:
     shared::Trajectory trajectory;
 
     double path_objective;
+    
+    long numPlannedTrajectories;
 };
 
 //std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
@@ -190,8 +192,8 @@ public:
         kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls);
 
         shared::Trajectory adjusted_trajectory;
-        adjusted_trajectory.xs.push_back(trajectory.xs[0]);
-        adjusted_trajectory.zs.push_back(trajectory.zs[0]);
+        adjusted_trajectory.xs.push_back(x_estimated_t);
+        adjusted_trajectory.zs.push_back(x_estimated_t);
 
         std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, trajectory.xs[0]);
         for (size_t i = 0; i < xs.size() - 1; i++) {
@@ -404,6 +406,8 @@ public:
 
             queue_ptr->pop();
         }
+        
+        res->numPlannedTrajectories = queue_size;
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>>& queue_ptr,
