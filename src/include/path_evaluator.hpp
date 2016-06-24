@@ -3,7 +3,6 @@
 #include <iostream>
 //#include <Eigen/Dense>
 #include <boost/random.hpp>
-#include <boost/thread.hpp>
 #include <boost/timer.hpp>
 //#include <boost/date_time/posix_time/posix_time.hpp>
 #include <queue>
@@ -148,7 +147,7 @@ public:
         D_ = D;
     }
 
-    void adjustAndEvaluatePath(shared::Trajectory& trajectory,
+    bool adjustAndEvaluatePath(shared::Trajectory& trajectory,
                                std::vector<double>& x_estimated,
                                Eigen::MatrixXd& P_t,
                                unsigned int& current_step,
@@ -162,6 +161,12 @@ public:
             us.push_back(trajectory.us[i]);
             control_durations.push_back(trajectory.control_durations[i]);
         }
+        
+        if (xs.size() < 2) {
+	    // The trajectory is too short to continue
+	    return false;
+	}
+        
         Eigen::MatrixXd P_t_n(P_t);
         std::vector<Eigen::MatrixXd> As;
         std::vector<Eigen::MatrixXd> Bs;
@@ -262,6 +267,7 @@ public:
         res = std::make_shared<shared::PathEvaluationResult>();
         res->trajectory = adjusted_trajectory;
         res->path_objective = objective;
+	return true;
     }
 
     double evaluatePath(std::vector<std::vector<double>>& state_path,
