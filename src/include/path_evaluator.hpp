@@ -210,7 +210,7 @@ public:
                     u_vec,
                     control_error,
                     control_durations[i],
-                    options_->simulation_step_size,
+                    options_->simulationStepSize,
                     res);
             adjusted_trajectory.xs.push_back(res);
             adjusted_trajectory.us.push_back(u_vec);
