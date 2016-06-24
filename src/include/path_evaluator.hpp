@@ -21,8 +21,8 @@ namespace shared
 template<class RobotType, class OptionsType>
 std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment>& robot_environment,
         std::shared_ptr<OptionsType>& options)
-{
-    std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();
+{    
+    std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();    
     std::unique_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));
     dyn->setup(env, options->dynamicPlanner);
     std::vector<double> goal_area;
