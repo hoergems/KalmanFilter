@@ -14,8 +14,8 @@ SET(PYTHON_MIN_VERSION "2.7.0")
 include(FindPkgConfig)
 include(GNUInstallDirs)
 
+set(USE_URDF False)
 set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
-
 ############################# LOAD PYTHON #############################
 if(PKG_CONFIG_FOUND)    
     pkg_check_modules(PYTHON python-2.7)
@@ -33,8 +33,7 @@ if(PKG_CONFIG_FOUND)
        message(FATAL_ERROR "EIGEN could not be found")
     endif()
     include_directories(${EIGEN_INCLUDE_DIRS}) 
-    message("-- Eigen include dirs: ${EIGEN_INCLUDE_DIRS}")
-    message("-- Eigen library dirs: ${EIGEN_LIBRARY_DIRS}")   
+    link_directories(${EIGEN_LIBRARY_DIRS}) 
 endif()
 
 ############################# LOAD ROBOTS #############################
@@ -74,28 +73,13 @@ if(PKG_CONFIG_FOUND)
        message(FATAL_ERROR "FCL could not be found")
     endif()
     include_directories(${FCL_INCLUDE_DIRS})
-    link_directories(${FCL_LIBRARY_DIRS}) 
-    message("-- FCL LIB DIRS ${FCL_LIBRARY_DIRS}")    
+    link_directories(${FCL_LIBRARY_DIRS})     
 endif()
-
-
-#add_library(KalmanFilter SHARED
-#            ${CMAKE_CURRENT_SOURCE_DIR}/src/kalman_filter.cpp)           
-
-
-#target_link_libraries (KalmanFilter                      
-#                       ${Boost_LIBRARIES}
-#                       ${PYTHON_LIBRARIES}
-#                       ${ROBOTS_LIBRARIES}
-#                       ${ROBOT_ENVIRONMENT_LIBRARIES}
-#                       ${FCL_LIBRARIES}
-#                       ${PATH_PLANNER_LIBRARIES})
 
 set(pkg_conf_file_in "${CMAKE_CURRENT_SOURCE_DIR}/kalman_filter.pc.in")
 set(pkg_conf_file_out "${CMAKE_CURRENT_BINARY_DIR}/kalman_filter.pc")
 configure_file("${pkg_conf_file_in}" "${pkg_conf_file_out}" @ONLY)
 
-#install(TARGETS KalmanFilter DESTINATION lib)
 install(DIRECTORY ${INCLUDE_DIR}/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kalman_filter
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hxx" PATTERN "*.hpp"
   PATTERN ".DS_Store" EXCLUDE
