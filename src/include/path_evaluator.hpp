@@ -1,10 +1,8 @@
 #ifndef _PATH_EVALUATOR_HPP_
 #define _PATH_EVALUATOR_HPP_
 #include <iostream>
-//#include <Eigen/Dense>
 #include <boost/random.hpp>
 #include <boost/timer.hpp>
-//#include <boost/date_time/posix_time/posix_time.hpp>
 #include <queue>
 #include <robot_environment/robot_environment.hpp>
 #include "kalman_filter.hpp"
@@ -372,8 +370,7 @@ public:
                               unsigned& num_threads,
                               std::shared_ptr<shared::PathEvaluationResult>& res) {
         std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
-        std::vector<boost::thread> threads;
-        //boost::thread_group eval_group;
+        std::vector<boost::thread> threads;        
         for (size_t i = 0; i < num_threads; i++) {
             threads.push_back(boost::thread(&PathEvaluator::eval_thread,
                                             this,
@@ -382,10 +379,9 @@ public:
                                             P_t,
                                             current_step));
         }
-        //boost::posix_time::seconds(1.0);
-        sleep(options_->stepTimeout / 1000.0);
-        for (size_t i = 0; i < threads.size(); i++) {	    
-            //t.timed_join(boost::posix_time::seconds(options_->stepTimeout / 1000.0));
+        
+        usleep(options_->stepTimeout * 1000.0);        
+        for (size_t i = 0; i < threads.size(); i++) {
 	    threads[i].interrupt();	    
         }
         
@@ -407,7 +403,10 @@ public:
             queue_ptr->pop();
         }
         
-        res->numPlannedTrajectories = queue_size;
+        if (res) {
+	    res->numPlannedTrajectories = queue_size;
+	}
+        
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>>& queue_ptr,
