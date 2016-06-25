@@ -19,8 +19,8 @@ namespace shared
 template<class RobotType, class OptionsType>
 std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment>& robot_environment,
         std::shared_ptr<OptionsType>& options)
-{    
-    std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();    
+{
+    std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();
     std::unique_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));
     dyn->setup(env, options->dynamicPlanner);
     std::vector<double> goal_area;
@@ -60,7 +60,7 @@ public:
     shared::Trajectory trajectory;
 
     double path_objective;
-    
+
     long numPlannedTrajectories;
 };
 
@@ -161,12 +161,12 @@ public:
             us.push_back(trajectory.us[i]);
             control_durations.push_back(trajectory.control_durations[i]);
         }
-        
+
         if (xs.size() < 2) {
-	    // The trajectory is too short to continue
-	    return false;
-	}
-        
+            // The trajectory is too short to continue
+            return false;
+        }
+
         Eigen::MatrixXd P_t_n(P_t);
         std::vector<Eigen::MatrixXd> As;
         std::vector<Eigen::MatrixXd> Bs;
@@ -267,7 +267,7 @@ public:
         res = std::make_shared<shared::PathEvaluationResult>();
         res->trajectory = adjusted_trajectory;
         res->path_objective = objective;
-	return true;
+        return true;
     }
 
     double evaluatePath(std::vector<std::vector<double>>& state_path,
@@ -368,9 +368,10 @@ public:
                               Eigen::MatrixXd& P_t,
                               unsigned int& current_step,
                               unsigned& num_threads,
-                              std::shared_ptr<shared::PathEvaluationResult>& res) {
+                              std::shared_ptr<shared::PathEvaluationResult>& res,
+                              unsigned int minNumPaths = 0) {
         std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
-        std::vector<boost::thread> threads;        
+        std::vector<boost::thread> threads;
         for (size_t i = 0; i < num_threads; i++) {
             threads.push_back(boost::thread(&PathEvaluator::eval_thread,
                                             this,
@@ -379,15 +380,20 @@ public:
                                             P_t,
                                             current_step));
         }
-        
-        usleep(options_->stepTimeout * 1000.0);        
-        for (size_t i = 0; i < threads.size(); i++) {
-	    threads[i].interrupt();	    
-        }
-        
-        for (size_t i = 0; i < threads.size(); i++) {
-	    threads[i].join();
+
+        usleep(options_->stepTimeout * 1000.0);
+	if (minNumPaths > 0) {
+	    while (queue_ptr->size() == 0) {
+		usleep(10);
+	    }
 	}
+        for (size_t i = 0; i < threads.size(); i++) {
+            threads[i].interrupt();
+        }
+
+        for (size_t i = 0; i < threads.size(); i++) {
+            threads[i].join();
+        }
 
         double best_objective = -1000000;
         unsigned int queue_size = queue_ptr->size();
@@ -402,11 +408,11 @@ public:
 
             queue_ptr->pop();
         }
-        
+
         if (res) {
-	    res->numPlannedTrajectories = queue_size;
-	}
-        
+            res->numPlannedTrajectories = queue_size;
+        }
+
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>>& queue_ptr,
@@ -463,14 +469,14 @@ public:
                     result->path_objective = objective;
                     boost::this_thread::interruption_point();
                     mtx_.lock();
-                    queue_ptr->push(result);                    
+                    queue_ptr->push(result);
                     mtx_.unlock();
                     boost::this_thread::interruption_point();
                 }
             }
 
-            catch (boost::thread_interrupted&) {                
-		return true;
+            catch (boost::thread_interrupted&) {
+                return true;
             }
         }
     }

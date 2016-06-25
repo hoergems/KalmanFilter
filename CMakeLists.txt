@@ -13,8 +13,6 @@ SET(PYTHON_MIN_VERSION "2.7.0")
 
 include(FindPkgConfig)
 include(GNUInstallDirs)
-
-set(USE_URDF False)
 set(INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/include")
 ############################# LOAD PYTHON #############################
 if(PKG_CONFIG_FOUND)    
