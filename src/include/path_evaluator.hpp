@@ -17,12 +17,12 @@ namespace shared
 {
 
 template<class RobotType, class OptionsType>
-std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment>& robot_environment,
+std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner2(std::shared_ptr<shared::RobotEnvironment>& robot_environment,
         std::shared_ptr<OptionsType>& options)
 {
-    std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();
-    std::unique_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));
-    dyn->setup(env, options->dynamicPlanner);
+    //std::shared_ptr<shared::RobotEnvironment> env = robot_environment->clone<RobotType>();
+    std::shared_ptr<shared::DynamicPathPlanner> dyn(new shared::DynamicPathPlanner(false));
+    dyn->setup(robot_environment, options->dynamicPlanner);
     std::vector<double> goal_area;
     robot_environment->getGoalArea(goal_area);
     std::vector<double> goal_position( {goal_area[0], goal_area[1], goal_area[2]});
@@ -30,7 +30,7 @@ std::unique_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_p
     std::vector<std::vector<double>> goal_states = robot_environment->getGoalStates();
     ompl::base::GoalPtr goal_region =
         shared::makeRobotGoalRegion(dyn->getSpaceInformation(),
-                                    env,
+                                    robot_environment,
                                     goal_states);
 
     dyn->setGoal(goal_region);
@@ -64,8 +64,6 @@ public:
     long numPlannedTrajectories;
 };
 
-//std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner(std::shared_ptr<shared::RobotEnvironment> &robot_environment);
-
 template<class RobotType, class OptionsType>
 class PathEvaluator
 {
@@ -73,7 +71,6 @@ public:
     PathEvaluator(std::shared_ptr<OptionsType>& options):
         options_(options),
         robot_environment_(nullptr),
-        dynamic_path_planner_(nullptr),
         kalman_filter_(),
         C_(),
         D_(),
@@ -87,10 +84,6 @@ public:
 
     void setRobotEnvironment(std::shared_ptr<shared::RobotEnvironment>& robot_environment) {
         robot_environment_ = robot_environment;
-    }
-
-    void setDynamicPathPlanner(std::shared_ptr<shared::DynamicPathPlanner>& dynamic_path_planner) {
-        dynamic_path_planner_ = dynamic_path_planner;
     }
 
     std::vector<Eigen::MatrixXd> getLinearModelMatricesState(const std::vector<double>& state,
@@ -367,33 +360,41 @@ public:
     bool planAndEvaluatePaths(const std::vector<double>& start_state,
                               Eigen::MatrixXd& P_t,
                               unsigned int& current_step,
-                              unsigned& num_threads,
+                              unsigned int& num_threads,
+                              std::vector<std::shared_ptr<shared::DynamicPathPlanner>>& dynamic_path_planners,
                               std::shared_ptr<shared::PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0) {
         std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
-        std::vector<boost::thread> threads;
+        std::vector<boost::thread*> threads;
         for (size_t i = 0; i < num_threads; i++) {
-            threads.push_back(boost::thread(&PathEvaluator::eval_thread,
-                                            this,
-                                            queue_ptr,
-                                            start_state,
-                                            P_t,
-                                            current_step));
+            threads.push_back(new boost::thread(&PathEvaluator::eval_thread,
+                                                this,
+                                                queue_ptr,
+                                                dynamic_path_planners[i],
+                                                start_state,
+                                                P_t,
+                                                current_step));
         }
 
         usleep(options_->stepTimeout * 1000.0);
-	if (minNumPaths > 0) {
-	    while (queue_ptr->size() == 0) {
-		usleep(10);
-	    }
-	}
+        if (minNumPaths > 0) {
+            while (queue_ptr->size() < minNumPaths) {
+                usleep(10);
+            }
+        }
         for (size_t i = 0; i < threads.size(); i++) {
-            threads[i].interrupt();
+            threads[i]->interrupt();
         }
 
         for (size_t i = 0; i < threads.size(); i++) {
-            threads[i].join();
+            threads[i]->join();
         }
+
+        for (size_t i = 0; i < threads.size(); i++) {
+            delete threads[i];
+        }
+
+        threads.clear();
 
         double best_objective = -1000000;
         unsigned int queue_size = queue_ptr->size();
@@ -416,18 +417,13 @@ public:
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>>& queue_ptr,
+                     std::shared_ptr<shared::DynamicPathPlanner>& dynamic_path_planner,
                      const std::vector<double>& start_state,
                      Eigen::MatrixXd& P_t,
                      unsigned int& current_step) {
-        std::shared_ptr<OptionsType> ptr;
-        std::unique_ptr<shared::DynamicPathPlanner> dynamic_path_planner;
         while (true) {
             try {
-                boost::this_thread::interruption_point();
-                dynamic_path_planner = shared::makeDynamicPathPlanner<RobotType, OptionsType>(robot_environment_, options_);
-
-                //construct a path
-                boost::this_thread::interruption_point();
+                dynamic_path_planner->reset();
                 std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, options_->stepTimeout);
                 if (solution.size() != 0) {
                     unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
@@ -489,8 +485,6 @@ private:
     std::shared_ptr<OptionsType> options_;
 
     boost::mutex mtx_;
-
-    std::shared_ptr<shared::DynamicPathPlanner> dynamic_path_planner_;
 
     std::shared_ptr<shared::RobotEnvironment> robot_environment_;
 
@@ -570,8 +564,6 @@ private:
             samples.push_back(sample);
         }
     }
-
-    std::shared_ptr<shared::DynamicPathPlanner> makeDynamicPathPlanner();
 
 };
 
