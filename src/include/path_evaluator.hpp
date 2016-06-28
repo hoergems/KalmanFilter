@@ -160,7 +160,7 @@ public:
             return false;
         }
 
-        Eigen::MatrixXd P_t_n(P_t);
+        Eigen::MatrixXd P_t_e(P_t);
         std::vector<Eigen::MatrixXd> As;
         std::vector<Eigen::MatrixXd> Bs;
         std::vector<Eigen::MatrixXd> Vs;
@@ -168,9 +168,9 @@ public:
         std::vector<Eigen::MatrixXd> Hs;
         std::vector<Eigen::MatrixXd> Ws;
         std::vector<Eigen::MatrixXd> Ns;
-        getLinearModelMatrices(trajectory.xs,
-                               trajectory.us,
-                               trajectory.control_durations,
+        getLinearModelMatrices(xs,
+                               us,
+                               control_durations,
                                As,
                                Bs,
                                Vs,
@@ -186,9 +186,9 @@ public:
         adjusted_trajectory.xs.push_back(x_estimated_t);
         adjusted_trajectory.zs.push_back(x_estimated_t);
 
-        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, trajectory.xs[0]);
+        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);	
         for (size_t i = 0; i < xs.size() - 1; i++) {
-            std::vector<double> x_predicted = xs[i];
+            std::vector<double> x_predicted = xs[i];	    
             VectorXd x_e_minus_p(x_predicted.size());
             for (size_t j = 0; j < x_predicted.size(); j++) {
                 x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
@@ -218,40 +218,40 @@ public:
 
             //Kalman prediction and update
             std::vector<double> x_tilde_dash_t;
-            std::vector<double> x_tilde_estimated;
+            //std::vector<double> x_tilde_estimated;
             std::vector<double> z_dash;
+	    Eigen::MatrixXd P_t_p;
             kalman_filter_->kalmanPredict(x_tilde,
                                           u_dash,
                                           As[i],
                                           Bs[i],
-                                          P_t,
+                                          P_t_e,
                                           Vs[i],
                                           Ms[i],
                                           x_tilde_dash_t,
-                                          P_t_n);
+                                          P_t_p);
             for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
                 z_dash.push_back(0.0);
             }
-            Eigen::MatrixXd estimated_cov;
+            
             kalman_filter_->kalmanUpdate(x_tilde_dash_t,
                                          z_dash,
                                          Hs[i],
-                                         P_t_n,
+                                         P_t_p,
                                          Ws[i],
                                          Ns[i],
-                                         x_tilde_estimated,
-                                         estimated_cov);
-            P_t_n = estimated_cov;
-            x_estimated_t = utils_kalman::addVectors(x_tilde_estimated, trajectory.xs[i + 1]);
-
+                                         x_tilde,
+                                         P_t_e);
+            x_estimated_t = utils_kalman::addVectors(x_tilde, xs[i + 1]);
         }
+        
         std::vector<double> ze;
         for (size_t i = 0; i < trajectory.us[0].size(); i++) {
             ze.push_back(0.0);
         }
+        
         adjusted_trajectory.us.push_back(ze);
         adjusted_trajectory.control_durations = control_durations;
-
         double objective = evaluatePath(adjusted_trajectory.xs,
                                         adjusted_trajectory.us,
                                         adjusted_trajectory.control_durations,
