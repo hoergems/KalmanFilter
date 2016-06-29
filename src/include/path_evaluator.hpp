@@ -248,7 +248,7 @@ public:
         std::vector<double> ze;
         for (size_t i = 0; i < trajectory.us[0].size(); i++) {
             ze.push_back(0.0);
-        }
+        }        
         
         adjusted_trajectory.us.push_back(ze);
         adjusted_trajectory.control_durations = control_durations;
@@ -256,18 +256,19 @@ public:
                                         adjusted_trajectory.us,
                                         adjusted_trajectory.control_durations,
                                         P_t,
-                                        current_step);
+                                        current_step);        
         res = std::make_shared<shared::PathEvaluationResult>();
         res->trajectory = adjusted_trajectory;
-        res->path_objective = objective;
+        res->path_objective = objective;        
         return true;
     }
 
     double evaluatePath(std::vector<std::vector<double>>& state_path,
                         std::vector<std::vector<double>>& control_path,
                         std::vector<double>& control_durations,
-                        Eigen::MatrixXd& P_t,
+                        Eigen::MatrixXd& P_t_in,
                         unsigned int& current_step) {
+        Eigen::MatrixXd P_t(P_t_in);
         std::vector<Eigen::MatrixXd> As;
         std::vector<Eigen::MatrixXd> Bs;
         std::vector<Eigen::MatrixXd> Vs;
