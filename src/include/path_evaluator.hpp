@@ -349,7 +349,7 @@ public:
                         double& terminal_reward,
                         double& discount_factor) {
         step_penalty_ = step_penalty;
-        illegal_move_penalty = illegal_move_penalty;
+        illegal_move_penalty_ = illegal_move_penalty;	
         terminal_reward_ = terminal_reward;
         discount_factor_ = discount_factor;
     }
@@ -518,7 +518,7 @@ private:
 	mtx_.unlock();
         bool collides = false;
         std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
-        robot_environment_->getObstacles(obstacles);
+        robot_environment_->getObstacles(obstacles);	
         for (size_t i = 0; i < num_samples_; i++) {
             // Check for collision
             std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;
@@ -540,6 +540,7 @@ private:
                 }
 
                 else {
+		    
                     expected_state_reward -= step_penalty_;
                 }
             }
