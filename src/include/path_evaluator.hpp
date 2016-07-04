@@ -364,7 +364,9 @@ public:
                               unsigned int& num_threads,
                               std::vector<std::shared_ptr<shared::DynamicPathPlanner>>& dynamic_path_planners,
                               std::shared_ptr<shared::PathEvaluationResult>& res,
-                              unsigned int minNumPaths = 0) {
+                              unsigned int minNumPaths = 0,
+			      double timeout = -1) {
+	cout << "HFR: Planning with timeout: " << timeout << endl;
         std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
         std::vector<boost::thread*> threads;
         for (size_t i = 0; i < num_threads; i++) {
@@ -377,7 +379,13 @@ public:
                                                 current_step));
         }
 
-        usleep(options_->stepTimeout * 1000.0);
+        if (timeout < 0) {
+	    usleep(options_->stepTimeout * 1000.0);
+	}
+	else {
+	    usleep(timeout * 1000.0);
+	}
+        
         if (minNumPaths > 0) {
             while (queue_ptr->size() < minNumPaths) {
                 usleep(10);
@@ -400,7 +408,7 @@ public:
         double best_objective = -1000000;
         unsigned int queue_size = queue_ptr->size();
         for (size_t i = 0; i < queue_size; i++) {
-            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();
+            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();	    
             if (next_queue_elem->path_objective > best_objective) {
                 best_objective = next_queue_elem->path_objective;
                 res = std::make_shared<shared::PathEvaluationResult>(*(next_queue_elem.get()));
@@ -425,8 +433,9 @@ public:
         while (true) {
             try {
                 dynamic_path_planner->reset();
-                std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, options_->stepTimeout);
-                if (solution.size() != 0) {
+                std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, 
+											options_->rrtTimeout / 1000.0);
+                if (solution.size() != 0) {		    
                     unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
                     unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
                     std::vector<std::vector<double>> xs;
@@ -454,8 +463,8 @@ public:
 
                     //Evaluate the solution
                     boost::timer t;
-                    boost::this_thread::interruption_point();
-                    double objective = evaluatePath(xs, us, control_durations, P_t, current_step);
+                    boost::this_thread::interruption_point();		    
+                    double objective = evaluatePath(xs, us, control_durations, P_t, current_step);		    
                     shared::Trajectory trajectory;
                     trajectory.xs = xs;
                     trajectory.us = us;
@@ -465,7 +474,7 @@ public:
                     result->trajectory = trajectory;
                     result->path_objective = objective;
                     boost::this_thread::interruption_point();
-                    mtx_.lock();
+                    mtx_.lock();		    
                     queue_ptr->push(result);
                     mtx_.unlock();
                     boost::this_thread::interruption_point();
@@ -504,7 +513,9 @@ private:
     double getExpectedStateReward(std::vector<double>& state, Eigen::MatrixXd& cov_state) {
         double expected_state_reward = 0.0;
         std::vector<std::vector<double>> state_samples;
+	mtx_.lock();
         sampleValidStates(state, cov_state, num_samples_, state_samples);
+	mtx_.unlock();
         bool collides = false;
         std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
         robot_environment_->getObstacles(obstacles);
@@ -547,7 +558,6 @@ private:
         for (size_t i = 0; i < mean.size(); i++) {
             mean_matr(i) = mean[i];
         }
-
         std::shared_ptr<shared::Robot> robot = robot_environment_->getRobot();
         std::shared_ptr<shared::EigenMultivariateNormal<double>> distr = robot_environment_->createDistribution(mean_matr, cov);
         for (size_t i = 0; i < num_samples; i++) {
