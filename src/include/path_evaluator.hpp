@@ -186,9 +186,9 @@ public:
         adjusted_trajectory.xs.push_back(x_estimated_t);
         adjusted_trajectory.zs.push_back(x_estimated_t);
 
-        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);	
+        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);
         for (size_t i = 0; i < xs.size() - 1; i++) {
-            std::vector<double> x_predicted = xs[i];	    
+            std::vector<double> x_predicted = xs[i];
             VectorXd x_e_minus_p(x_predicted.size());
             for (size_t j = 0; j < x_predicted.size(); j++) {
                 x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
@@ -220,7 +220,7 @@ public:
             std::vector<double> x_tilde_dash_t;
             //std::vector<double> x_tilde_estimated;
             std::vector<double> z_dash;
-	    Eigen::MatrixXd P_t_p;
+            Eigen::MatrixXd P_t_p;
             kalman_filter_->kalmanPredict(x_tilde,
                                           u_dash,
                                           As[i],
@@ -233,7 +233,7 @@ public:
             for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
                 z_dash.push_back(0.0);
             }
-            
+
             kalman_filter_->kalmanUpdate(x_tilde_dash_t,
                                          z_dash,
                                          Hs[i],
@@ -244,22 +244,22 @@ public:
                                          P_t_e);
             x_estimated_t = utils_kalman::addVectors(x_tilde, xs[i + 1]);
         }
-        
+
         std::vector<double> ze;
         for (size_t i = 0; i < trajectory.us[0].size(); i++) {
             ze.push_back(0.0);
-        }        
-        
+        }
+
         adjusted_trajectory.us.push_back(ze);
         adjusted_trajectory.control_durations = control_durations;
         double objective = evaluatePath(adjusted_trajectory.xs,
                                         adjusted_trajectory.us,
                                         adjusted_trajectory.control_durations,
                                         P_t,
-                                        current_step);        
+                                        current_step);
         res = std::make_shared<shared::PathEvaluationResult>();
         res->trajectory = adjusted_trajectory;
-        res->path_objective = objective;        
+        res->path_objective = objective;
         return true;
     }
 
@@ -349,7 +349,7 @@ public:
                         double& terminal_reward,
                         double& discount_factor) {
         step_penalty_ = step_penalty;
-        illegal_move_penalty_ = illegal_move_penalty;	
+        illegal_move_penalty_ = illegal_move_penalty;
         terminal_reward_ = terminal_reward;
         discount_factor_ = discount_factor;
     }
@@ -365,8 +365,8 @@ public:
                               std::vector<std::shared_ptr<shared::DynamicPathPlanner>>& dynamic_path_planners,
                               std::shared_ptr<shared::PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0,
-			      double timeout = -1) {
-	cout << "HFR: Planning with timeout: " << timeout << endl;
+                              double timeout = -1) {
+        cout << "HFR: Planning with timeout: " << timeout << endl;
         std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<shared::PathEvaluationResult>>);
         std::vector<boost::thread*> threads;
         for (size_t i = 0; i < num_threads; i++) {
@@ -380,12 +380,11 @@ public:
         }
 
         if (timeout < 0) {
-	    usleep(options_->stepTimeout * 1000.0);
-	}
-	else {
-	    usleep(timeout * 1000.0);
-	}
-        
+            usleep(options_->stepTimeout * 1000.0);
+        } else {
+            usleep(timeout * 1000.0);
+        }
+
         if (minNumPaths > 0) {
             while (queue_ptr->size() < minNumPaths) {
                 usleep(10);
@@ -398,17 +397,16 @@ public:
         for (size_t i = 0; i < threads.size(); i++) {
             threads[i]->join();
         }
-
+        
         for (size_t i = 0; i < threads.size(); i++) {
             delete threads[i];
         }
 
         threads.clear();
-
         double best_objective = -1000000;
         unsigned int queue_size = queue_ptr->size();
         for (size_t i = 0; i < queue_size; i++) {
-            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();	    
+            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();
             if (next_queue_elem->path_objective > best_objective) {
                 best_objective = next_queue_elem->path_objective;
                 res = std::make_shared<shared::PathEvaluationResult>(*(next_queue_elem.get()));
@@ -431,11 +429,12 @@ public:
                      Eigen::MatrixXd& P_t,
                      unsigned int& current_step) {
         while (true) {
-            try {
-                dynamic_path_planner->reset();
-                std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state, 
-											options_->rrtTimeout / 1000.0);
-                if (solution.size() != 0) {		    
+            try {                
+                dynamic_path_planner->reset();                
+                std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state,
+                                              options_->rrtTimeout / 1000.0);
+                
+                if (solution.size() != 0) {
                     unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
                     unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
                     std::vector<std::vector<double>> xs;
@@ -462,8 +461,7 @@ public:
                     }
 
                     //Evaluate the solution
-                    boost::timer t;
-                    boost::this_thread::interruption_point();		    
+                    boost::this_thread::interruption_point();                    
                     double objective = evaluatePath(xs, us, control_durations, P_t, current_step);		    
                     shared::Trajectory trajectory;
                     trajectory.xs = xs;
@@ -474,7 +472,7 @@ public:
                     result->trajectory = trajectory;
                     result->path_objective = objective;
                     boost::this_thread::interruption_point();
-                    mtx_.lock();		    
+                    mtx_.lock();
                     queue_ptr->push(result);
                     mtx_.unlock();
                     boost::this_thread::interruption_point();
@@ -482,6 +480,7 @@ public:
             }
 
             catch (boost::thread_interrupted&) {
+		dynamic_path_planner->reset();
                 return true;
             }
         }
@@ -513,12 +512,12 @@ private:
     double getExpectedStateReward(std::vector<double>& state, Eigen::MatrixXd& cov_state) {
         double expected_state_reward = 0.0;
         std::vector<std::vector<double>> state_samples;
-	mtx_.lock();
+        mtx_.lock();
         sampleValidStates(state, cov_state, num_samples_, state_samples);
-	mtx_.unlock();
+        mtx_.unlock();
         bool collides = false;
         std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
-        robot_environment_->getObstacles(obstacles);	
+        robot_environment_->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
             // Check for collision
             std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;
@@ -540,7 +539,7 @@ private:
                 }
 
                 else {
-		    
+
                     expected_state_reward -= step_penalty_;
                 }
             }
