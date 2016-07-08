@@ -70,8 +70,7 @@ class PathEvaluator
 {
 public:
     PathEvaluator(std::shared_ptr<OptionsType>& options):
-        options_(options),
-        robot_environment_(nullptr),
+        options_(options),        
         kalman_filter_(),
         C_(),
         D_(),
@@ -82,11 +81,7 @@ public:
         num_samples_(1) {
 
     }
-
-    void setRobotEnvironment(std::shared_ptr<shared::RobotEnvironment>& robot_environment) {
-        robot_environment_ = robot_environment;
-    }
-
+    
     std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::shared_ptr<shared::RobotEnvironment>& env,
             const std::vector<double>& state,
             std::vector<double>& control,
@@ -202,14 +197,14 @@ public:
             Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);
             Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;
             std::vector<double> u_vec = utils_kalman::toStdVec(u);
-            robot_environment_->getRobot()->enforceControlConstraints(u_vec);
+            env->getRobot()->enforceControlConstraints(u_vec);
             std::vector<double> control_error;
             for (size_t j = 0; j < u_vec.size(); j++) {
                 control_error.push_back(0.0);
             }
 
             std::vector<double> res;
-            robot_environment_->getRobot()->propagateState(xs[i],
+            env->getRobot()->propagateState(xs[i],
                     u_vec,
                     control_error,
                     control_durations[i],
@@ -218,7 +213,7 @@ public:
             adjusted_trajectory.xs.push_back(res);
             adjusted_trajectory.us.push_back(u_vec);
             std::vector<double> z_elem;
-            robot_environment_->getRobot()->transformToObservationSpace(res, z_elem);
+            env->getRobot()->transformToObservationSpace(res, z_elem);
             adjusted_trajectory.zs.push_back(z_elem);
 
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
@@ -259,7 +254,7 @@ public:
 
         adjusted_trajectory.us.push_back(ze);
         adjusted_trajectory.control_durations = control_durations;
-        double objective = evaluatePath(robot_environment_,
+        double objective = evaluatePath(env,
                                         adjusted_trajectory.xs,
                                         adjusted_trajectory.us,
                                         adjusted_trajectory.control_durations,
@@ -507,8 +502,6 @@ private:
     std::shared_ptr<OptionsType> options_;
 
     boost::mutex mtx_;
-
-    std::shared_ptr<shared::RobotEnvironment> robot_environment_;
 
     std::shared_ptr<shared::KalmanFilter> kalman_filter_;
 
