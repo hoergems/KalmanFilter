@@ -12,6 +12,7 @@
 #include <path_planner/trajectory.hpp>
 #include <unistd.h>
 #include <memory>
+#include <signal.h>
 
 namespace shared
 {
@@ -86,12 +87,13 @@ public:
         robot_environment_ = robot_environment;
     }
 
-    std::vector<Eigen::MatrixXd> getLinearModelMatricesState(const std::vector<double>& state,
+    std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::shared_ptr<shared::RobotEnvironment>& env,
+            const std::vector<double>& state,
             std::vector<double>& control,
             double control_duration) const {
         std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
         std::vector<Eigen::MatrixXd> A_B_V_H_W;
-        robot_environment_->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
+        env->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);	
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[0]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[1]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[2]);
@@ -99,17 +101,18 @@ public:
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[4]);
 
         Eigen::MatrixXd M;
-        robot_environment_->getRobot()->getStateCovarianceMatrix(M);
+        env->getRobot()->getStateCovarianceMatrix(M);
         A_B_V_H_W_M_N.push_back(M);
 
         Eigen::MatrixXd N;
-        robot_environment_->getRobot()->getObservationCovarianceMatrix(N);
+        env->getRobot()->getObservationCovarianceMatrix(N);
         A_B_V_H_W_M_N.push_back(N);
 
         return A_B_V_H_W_M_N;
     }
 
-    void getLinearModelMatrices(std::vector<std::vector<double>>& state_path,
+    void getLinearModelMatrices(std::shared_ptr<shared::RobotEnvironment>& env,
+                                std::vector<std::vector<double>>& state_path,
                                 std::vector<std::vector<double>>& control_path,
                                 std::vector<double>& control_durations,
                                 std::vector<Eigen::MatrixXd>& As,
@@ -121,7 +124,7 @@ public:
                                 std::vector<Eigen::MatrixXd>& Ns) {
         //std::vector<Eigen::MatrixXd> A_B_V_H_W;
         for (size_t i = 0; i < state_path.size(); i++) {
-            std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(state_path[i], control_path[i], control_durations[i]);
+            std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(env, state_path[i], control_path[i], control_durations[i]);
             As.push_back(A_B_V_H_W_M_N[0]);
             Bs.push_back(A_B_V_H_W_M_N[1]);
             Vs.push_back(A_B_V_H_W_M_N[2]);
@@ -140,7 +143,8 @@ public:
         D_ = D;
     }
 
-    bool adjustAndEvaluatePath(shared::Trajectory& trajectory,
+    bool adjustAndEvaluatePath(std::shared_ptr<shared::RobotEnvironment>& env,
+                               shared::Trajectory& trajectory,
                                std::vector<double>& x_estimated,
                                Eigen::MatrixXd& P_t,
                                unsigned int& current_step,
@@ -168,7 +172,8 @@ public:
         std::vector<Eigen::MatrixXd> Hs;
         std::vector<Eigen::MatrixXd> Ws;
         std::vector<Eigen::MatrixXd> Ns;
-        getLinearModelMatrices(xs,
+        getLinearModelMatrices(env,
+                               xs,
                                us,
                                control_durations,
                                As,
@@ -212,7 +217,9 @@ public:
                     res);
             adjusted_trajectory.xs.push_back(res);
             adjusted_trajectory.us.push_back(u_vec);
-            adjusted_trajectory.zs.push_back(res);
+            std::vector<double> z_elem;
+            robot_environment_->getRobot()->transformToObservationSpace(res, z_elem);
+            adjusted_trajectory.zs.push_back(z_elem);
 
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
 
@@ -252,7 +259,8 @@ public:
 
         adjusted_trajectory.us.push_back(ze);
         adjusted_trajectory.control_durations = control_durations;
-        double objective = evaluatePath(adjusted_trajectory.xs,
+        double objective = evaluatePath(robot_environment_,
+                                        adjusted_trajectory.xs,
                                         adjusted_trajectory.us,
                                         adjusted_trajectory.control_durations,
                                         P_t,
@@ -263,7 +271,8 @@ public:
         return true;
     }
 
-    double evaluatePath(std::vector<std::vector<double>>& state_path,
+    double evaluatePath(std::shared_ptr<shared::RobotEnvironment>& env,
+                        std::vector<std::vector<double>>& state_path,
                         std::vector<std::vector<double>>& control_path,
                         std::vector<double>& control_durations,
                         Eigen::MatrixXd& P_t_in,
@@ -277,7 +286,8 @@ public:
         std::vector<Eigen::MatrixXd> Ws;
         std::vector<Eigen::MatrixXd> Ns;
 
-        getLinearModelMatrices(state_path,
+        getLinearModelMatrices(env,
+                               state_path,
                                control_path,
                                control_durations,
                                As,
@@ -336,8 +346,8 @@ public:
                     Gamma_t_l_l, Ls[i - 1];
 
             Eigen::MatrixXd Cov(Gamma_t * R_t * Gamma_t.transpose());
-            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));
-            double expected_state_reward = getExpectedStateReward(state_path[i], cov_state);
+            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));           
+            double expected_state_reward = 0.0;            
             path_reward += std::pow(discount_factor_, current_step + i) * expected_state_reward;
         }
 
@@ -362,6 +372,7 @@ public:
                               Eigen::MatrixXd& P_t,
                               unsigned int& current_step,
                               unsigned int& num_threads,
+                              std::vector<std::shared_ptr<shared::RobotEnvironment>>& robot_environments,
                               std::vector<std::shared_ptr<shared::DynamicPathPlanner>>& dynamic_path_planners,
                               std::shared_ptr<shared::PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0,
@@ -373,6 +384,7 @@ public:
             threads.push_back(new boost::thread(&PathEvaluator::eval_thread,
                                                 this,
                                                 queue_ptr,
+                                                robot_environments[i],
                                                 dynamic_path_planners[i],
                                                 start_state,
                                                 P_t,
@@ -397,7 +409,7 @@ public:
         for (size_t i = 0; i < threads.size(); i++) {
             threads[i]->join();
         }
-        
+
         for (size_t i = 0; i < threads.size(); i++) {
             delete threads[i];
         }
@@ -424,19 +436,20 @@ public:
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<shared::PathEvaluationResult>>>& queue_ptr,
+                     std::shared_ptr<shared::RobotEnvironment>& env,
                      std::shared_ptr<shared::DynamicPathPlanner>& dynamic_path_planner,
                      const std::vector<double>& start_state,
                      Eigen::MatrixXd& P_t,
                      unsigned int& current_step) {
         while (true) {
-            try {                
-                dynamic_path_planner->reset();                
+            try {
+                dynamic_path_planner->reset();
                 std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state,
                                               options_->rrtTimeout / 1000.0);
-                
+
                 if (solution.size() != 0) {
-                    unsigned int state_space_dimension = robot_environment_->getRobot()->getStateSpaceDimension();
-                    unsigned int control_space_dimension = robot_environment_->getRobot()->getControlSpaceDimension();
+                    unsigned int state_space_dimension = env->getRobot()->getStateSpaceDimension();
+                    unsigned int control_space_dimension = env->getRobot()->getControlSpaceDimension();
                     std::vector<std::vector<double>> xs;
                     std::vector<std::vector<double>> us;
                     std::vector<std::vector<double>> zs;
@@ -450,9 +463,9 @@ public:
                             if (j < control_space_dimension) {
                                 u_elem.push_back(solution[i][state_space_dimension + j]);
                             }
-
-                            z_elem.push_back(solution[i][state_space_dimension + control_space_dimension + j]);
                         }
+                        env->getRobot()->transformToObservationSpace(x_elem, z_elem);
+
 
                         control_durations.push_back(solution[i][2 * state_space_dimension + control_space_dimension]);
                         xs.push_back(x_elem);
@@ -461,8 +474,8 @@ public:
                     }
 
                     //Evaluate the solution
-                    boost::this_thread::interruption_point();                    
-                    double objective = evaluatePath(xs, us, control_durations, P_t, current_step);		    
+                    boost::this_thread::interruption_point();
+                    double objective = evaluatePath(env, xs, us, control_durations, P_t, current_step);
                     shared::Trajectory trajectory;
                     trajectory.xs = xs;
                     trajectory.us = us;
@@ -480,7 +493,7 @@ public:
             }
 
             catch (boost::thread_interrupted&) {
-		dynamic_path_planner->reset();
+                dynamic_path_planner->reset();
                 return true;
             }
         }
@@ -509,19 +522,23 @@ private:
 
     unsigned int num_samples_;
 
-    double getExpectedStateReward(std::vector<double>& state, Eigen::MatrixXd& cov_state) {
-        double expected_state_reward = 0.0;
+    bool getExpectedStateReward(std::shared_ptr<shared::RobotEnvironment>& env,
+                                std::vector<double>& state,
+                                Eigen::MatrixXd& cov_state,
+                                double& expected_state_reward) {
         std::vector<std::vector<double>> state_samples;
-        mtx_.lock();
-        sampleValidStates(state, cov_state, num_samples_, state_samples);
-        mtx_.unlock();
+        if (!sampleValidStates(env, state, cov_state, num_samples_, state_samples)) {
+            cout << "RETURN FALSE" << endl;
+            return false;
+        }
+
         bool collides = false;
         std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
-        robot_environment_->getObstacles(obstacles);
+        env->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
             // Check for collision
             std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;
-            robot_environment_->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);
+            env->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);
             collides = false;
             for (size_t j = 0; j < obstacles.size(); j++) {
                 if (!obstacles[j]->getTerrain()->isTraversable()) {
@@ -534,22 +551,22 @@ private:
             }
 
             if (!collides) {
-                if (robot_environment_->getRobot()->isTerminal(state_samples[i])) {
+                if (env->getRobot()->isTerminal(state_samples[i])) {
                     expected_state_reward += terminal_reward_;
                 }
 
                 else {
-
                     expected_state_reward -= step_penalty_;
                 }
             }
 
         }
-
-        return expected_state_reward / float(num_samples_);
+        expected_state_reward /= float(num_samples_);
+        return true;
     }
 
-    void sampleValidStates(std::vector<double>& mean,
+    bool sampleValidStates(std::shared_ptr<shared::RobotEnvironment>& env,
+                           std::vector<double>& mean,
                            Eigen::MatrixXd& cov,
                            unsigned int num_samples,
                            std::vector<std::vector<double>>& samples) {
@@ -557,15 +574,16 @@ private:
         Eigen::MatrixXd mean_matr(mean.size(), 1);
         for (size_t i = 0; i < mean.size(); i++) {
             mean_matr(i) = mean[i];
-        }
-        std::shared_ptr<shared::Robot> robot = robot_environment_->getRobot();
-        std::shared_ptr<shared::EigenMultivariateNormal<double>> distr = robot_environment_->createDistribution(mean_matr, cov);
+        }       
+
+        std::shared_ptr<shared::Robot> robot = env->getRobot();
+	unsigned int seed = std::time(nullptr);
+        std::shared_ptr<Eigen::EigenMultivariateNormal<double>> distr = env->createDistribution(mean_matr, cov, seed);
+        Eigen::MatrixXd samples_e = distr->samples(num_samples);
         for (size_t i = 0; i < num_samples; i++) {
             std::vector<double> sample;
-            Eigen::MatrixXd sample_m(mean.size(), 1);
-            distr->nextSample(sample_m);
             for (size_t j = 0; j < mean.size(); j++) {
-                sample.push_back(sample_m(j));
+                sample.push_back(samples_e(j, i));
             }
 
             if (robot->constraintsEnforced()) {
@@ -574,6 +592,8 @@ private:
 
             samples.push_back(sample);
         }
+
+        return true;
     }
 
 };
