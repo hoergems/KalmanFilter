@@ -84,7 +84,7 @@ public:
         estimatedCovariance = (I - KtH) * predictedCovariance;
     }
 
-    void computeLGains(std::vector<Eigen::MatrixXd>& A,
+    bool computeLGains(std::vector<Eigen::MatrixXd>& A,
                        std::vector<Eigen::MatrixXd>& B,
                        Eigen::MatrixXd& C,
                        Eigen::MatrixXd& D,
@@ -100,32 +100,18 @@ public:
             Eigen::MatrixXd B_tr = Bs[i].transpose();
             Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
             if (std::isnan(L(0, 0))) {
-                cout << "i " << i << endl;
-                cout << "horizon " << horizon <<  endl;
-                cout << "As.size() " << As.size() << endl;
-                cout << "S " << S << endl;
-                cout << "Bs[i] " << Bs[i] << endl;
-                cout << "As[i] " << As[i] << endl;
-                cout << "D " << D << endl;
-                cout << "inv: " << (B_tr * S * Bs[i] + D).inverse() << endl;
-                cout << "L is nan" << endl;
-                raise(SIGSEGV);
-
+                return false;
             }
             gains.push_back(L);
             MatrixXd S_old = S;
             S = C + A_tr * S * As[i] + A_tr * S * Bs[i] * L;
             if (std::isnan(S(0, 0))) {
-                cout << "Bs[i] " << Bs[i] << endl;
-                cout << "As[i] " << As[i] << endl;
-                cout << "S is nan" << endl << endl;
-
-                cout << "term1 " << A_tr* S_old* As[i] << endl;
-                cout << "term2 " << A_tr* S_old* Bs[i] * L << endl;
+                return false;
             }
         }
-
+        
         std::reverse(gains.begin(), gains.end());
+	return true;
     }
 
     void ekfPredictState(std::shared_ptr<shared::RobotEnvironment>& env,

@@ -180,7 +180,9 @@ public:
                                Ns);
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = xs.size() - 1;
-        kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls);
+        if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
+	    return false;
+	}
 
         shared::Trajectory adjusted_trajectory;
         adjusted_trajectory.xs.push_back(x_estimated_t);
@@ -203,17 +205,17 @@ public:
                 control_error.push_back(0.0);
             }
 
-            std::vector<double> res;
+            std::vector<double> propagationResult;
             env->getRobot()->propagateState(xs[i],
                     u_vec,
                     control_error,
                     control_durations[i],
                     options_->simulationStepSize,
-                    res);
-            adjusted_trajectory.xs.push_back(res);
+                    propagationResult);
+            adjusted_trajectory.xs.push_back(propagationResult);
             adjusted_trajectory.us.push_back(u_vec);
             std::vector<double> z_elem;
-            env->getRobot()->transformToObservationSpace(res, z_elem);
+            env->getRobot()->transformToObservationSpace(propagationResult, z_elem);
             adjusted_trajectory.zs.push_back(z_elem);
 
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
@@ -296,7 +298,9 @@ public:
         unsigned int horizon_L = state_path.size();
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = horizon_L - 1;
-        kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls);
+        if(!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
+	    return 0.0;
+	}
         Eigen::MatrixXd Q_t_up(Ms[0].rows(), Ms[0].cols() + Ns[0].cols());
         Eigen::MatrixXd Q_t_down(Ns[0].rows(), Ms[0].cols() + Ns[0].cols());
         Eigen::MatrixXd Q_t_up_right = Eigen::MatrixXd::Zero(Ms[0].rows(), Ns[0].cols());
