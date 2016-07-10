@@ -70,7 +70,7 @@ class PathEvaluator
 {
 public:
     PathEvaluator(std::shared_ptr<OptionsType>& options):
-        options_(options),        
+        options_(options),
         kalman_filter_(),
         C_(),
         D_(),
@@ -81,14 +81,14 @@ public:
         num_samples_(1) {
 
     }
-    
+
     std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::shared_ptr<shared::RobotEnvironment>& env,
             const std::vector<double>& state,
             std::vector<double>& control,
             double control_duration) const {
         std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
         std::vector<Eigen::MatrixXd> A_B_V_H_W;
-        env->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);	
+        env->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[0]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[1]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[2]);
@@ -181,8 +181,8 @@ public:
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = xs.size() - 1;
         if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
-	    return false;
-	}
+            return false;
+        }
 
         shared::Trajectory adjusted_trajectory;
         adjusted_trajectory.xs.push_back(x_estimated_t);
@@ -207,11 +207,11 @@ public:
 
             std::vector<double> propagationResult;
             env->getRobot()->propagateState(xs[i],
-                    u_vec,
-                    control_error,
-                    control_durations[i],
-                    options_->simulationStepSize,
-                    propagationResult);
+                                            u_vec,
+                                            control_error,
+                                            control_durations[i],
+                                            options_->simulationStepSize,
+                                            propagationResult);
             adjusted_trajectory.xs.push_back(propagationResult);
             adjusted_trajectory.us.push_back(u_vec);
             std::vector<double> z_elem;
@@ -298,9 +298,9 @@ public:
         unsigned int horizon_L = state_path.size();
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = horizon_L - 1;
-        if(!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
-	    return 0.0;
-	}
+        if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
+            return 0.0;
+        }
         Eigen::MatrixXd Q_t_up(Ms[0].rows(), Ms[0].cols() + Ns[0].cols());
         Eigen::MatrixXd Q_t_down(Ns[0].rows(), Ms[0].cols() + Ns[0].cols());
         Eigen::MatrixXd Q_t_up_right = Eigen::MatrixXd::Zero(Ms[0].rows(), Ns[0].cols());
@@ -345,8 +345,12 @@ public:
                     Gamma_t_l_l, Ls[i - 1];
 
             Eigen::MatrixXd Cov(Gamma_t * R_t * Gamma_t.transpose());
-            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));           
+            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));
             double expected_state_reward = 0.0;            
+            getExpectedStateReward(env,
+                                   state_path[i],
+                                   cov_state,
+                                   expected_state_reward);
             path_reward += std::pow(discount_factor_, current_step + i) * expected_state_reward;
         }
 
@@ -571,12 +575,12 @@ private:
         Eigen::MatrixXd mean_matr(mean.size(), 1);
         for (size_t i = 0; i < mean.size(); i++) {
             mean_matr(i) = mean[i];
-        }       
+        }
 
         std::shared_ptr<shared::Robot> robot = env->getRobot();
-	unsigned int seed = std::time(nullptr);
+        unsigned int seed = std::time(nullptr);
         std::shared_ptr<Eigen::EigenMultivariateNormal<double>> distr = env->createDistribution(mean_matr, cov, seed);
-        Eigen::MatrixXd samples_e = distr->samples(num_samples);
+        Eigen::MatrixXd samples_e = distr->samples(num_samples);        
         for (size_t i = 0; i < num_samples; i++) {
             std::vector<double> sample;
             for (size_t j = 0; j < mean.size(); j++) {
