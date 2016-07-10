@@ -580,7 +580,10 @@ private:
         std::shared_ptr<shared::Robot> robot = env->getRobot();
         unsigned int seed = std::time(nullptr);
         std::shared_ptr<Eigen::EigenMultivariateNormal<double>> distr = env->createDistribution(mean_matr, cov, seed);
-        Eigen::MatrixXd samples_e = distr->samples(num_samples);        
+        Eigen::MatrixXd samples_e = distr->samples(num_samples);
+	if (std::isnan(samples_e(0, 0))) {
+	    return false;
+	}
         for (size_t i = 0; i < num_samples; i++) {
             std::vector<double> sample;
             for (size_t j = 0; j < mean.size(); j++) {
