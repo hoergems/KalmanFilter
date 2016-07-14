@@ -92,12 +92,20 @@ public:
                        unsigned int& horizon,
                        std::vector<Eigen::MatrixXd>& gains) {
 	
-        Eigen::MatrixXd S = C;
+        Eigen::MatrixXd S(C);
         std::vector<Eigen::MatrixXd> As(A);
         std::vector<Eigen::MatrixXd> Bs(B);
-        std::reverse(As.begin(), As.end());
-        std::reverse(Bs.begin(), Bs.end());
-        for (size_t i = 0; i < horizon; i++) {
+        //std::reverse(As.begin(), As.end());
+        //std::reverse(Bs.begin(), Bs.end());
+	for (size_t i = horizon; i --> 0;) {
+	    Eigen::MatrixXd A_tr = As[i].transpose();
+            Eigen::MatrixXd B_tr = Bs[i].transpose();
+	    Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
+	    gains.push_back(L);
+            MatrixXd S_old(S);
+            S = C + A_tr * S_old * As[i] + A_tr * S_old * Bs[i] * L;
+	}
+        /**for (size_t i = 0; i < horizon; i++) {
             Eigen::MatrixXd A_tr = As[i].transpose();
             Eigen::MatrixXd B_tr = Bs[i].transpose();
             Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
@@ -105,12 +113,12 @@ public:
                 return false;
             }
             gains.push_back(L);
-            MatrixXd S_old = S;
+            MatrixXd S_old(S);
             S = C + A_tr * S_old * As[i] + A_tr * S_old * Bs[i] * L;
             if (std::isnan(S(0, 0))) {
                 return false;
             }
-        }
+        }*/
         
         std::reverse(gains.begin(), gains.end());
 	return true;

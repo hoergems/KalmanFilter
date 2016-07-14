@@ -180,8 +180,9 @@ public:
                                Ns);
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = xs.size() - 1;
-        if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
-            return false;
+        if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {            
+	    return false;
+	    
         }
 
         shared::Trajectory adjusted_trajectory;
@@ -196,10 +197,10 @@ public:
                 x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
             }
 
-            Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);
+            Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);	    
             Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;
             std::vector<double> u_vec = utils_kalman::toStdVec(u);
-            env->getRobot()->enforceControlConstraints(u_vec);
+            //env->getRobot()->enforceControlConstraints(u_vec);
             std::vector<double> control_error;
             for (size_t j = 0; j < u_vec.size(); j++) {
                 control_error.push_back(0.0);
@@ -353,6 +354,7 @@ public:
             }*/           
             MatrixXd R_t_new  = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();
             R_t = R_t_new;
+	    
             Eigen::MatrixXd Gamma_t_u_l = Eigen::MatrixXd::Identity(P_t.rows(), P_t.cols());
             Eigen::MatrixXd Gamma_t_u_r = Eigen::MatrixXd::Zero(Gamma_t_u_l.rows(), Ls[i - 1].cols());
             Eigen::MatrixXd Gamma_t_l_l = Eigen::MatrixXd::Zero(Ls[i - 1].rows(), Gamma_t_u_l.cols());
@@ -360,7 +362,7 @@ public:
             Gamma_t << Gamma_t_u_l, Gamma_t_u_r,
                     Gamma_t_l_l, Ls[i - 1];
             Eigen::MatrixXd Cov = Gamma_t * R_t * Gamma_t.transpose();
-            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));            
+            Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));
             double expected_state_reward = 0.0;
             getExpectedStateReward(env,
                                    state_path[i],
@@ -601,8 +603,7 @@ private:
         if (std::isnan(samples_e(0, 0))) {
             return false;
         }
-        for (size_t i = 0; i < num_samples; i++) {
-            //cout << "s " << samples_e.col(i) << endl;
+        for (size_t i = 0; i < num_samples; i++) {            
             std::vector<double> sample;
             for (size_t j = 0; j < mean.size(); j++) {
                 sample.push_back(samples_e(j, i));
