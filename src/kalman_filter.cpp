@@ -143,7 +143,9 @@ void KalmanFilter::computeLGains(std::vector<Eigen::MatrixXd> &A,
 		Eigen::MatrixXd B_tr = Bs[i].transpose();
 		Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
 		gains.push_back(L);
-		S = C + A_tr * S * As[i] + A_tr * S * Bs[i] * L;
+		MatrixXd S_new;
+		S_new = C + A_tr * S * As[i] + A_tr * S * Bs[i] * L;
+		S = S_new;
 	}
 	
 	std::reverse(gains.begin(), gains.end());	

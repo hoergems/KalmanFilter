@@ -60,7 +60,8 @@ public:
                            Eigen::MatrixXd& N,
                            Eigen::MatrixXd& kalmanGain) {
         Eigen::MatrixXd H_transpose = H.transpose();
-        kalmanGain = predictedCovariance * H_transpose * (H * predictedCovariance * H_transpose + W * N * W.transpose()).inverse();
+	Eigen::MatrixXd S = H * predictedCovariance * H_transpose + W * N * W.transpose();
+        kalmanGain = predictedCovariance * H_transpose * S.inverse();
     }
 
     void computeStateEstimate(std::vector<double>& x_predicted,
@@ -90,7 +91,8 @@ public:
                        Eigen::MatrixXd& D,
                        unsigned int& horizon,
                        std::vector<Eigen::MatrixXd>& gains) {
-        Eigen::MatrixXd S(C);
+	
+        Eigen::MatrixXd S = C;
         std::vector<Eigen::MatrixXd> As(A);
         std::vector<Eigen::MatrixXd> Bs(B);
         std::reverse(As.begin(), As.end());
@@ -104,7 +106,7 @@ public:
             }
             gains.push_back(L);
             MatrixXd S_old = S;
-            S = C + A_tr * S * As[i] + A_tr * S * Bs[i] * L;
+            S = C + A_tr * S_old * As[i] + A_tr * S_old * Bs[i] * L;
             if (std::isnan(S(0, 0))) {
                 return false;
             }

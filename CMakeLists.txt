@@ -7,7 +7,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CXX_FLAGS_DEBUG "-g -std=c++11 -O3 -w")
-set(CMAKE_CXX_FLAGS_RELEASE "-g -std=c++11 -O3 -w")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O3 -w")
 SET(BOOST_MIN_VERSION "1.54.0")
 SET(PYTHON_MIN_VERSION "2.7.0")
 
