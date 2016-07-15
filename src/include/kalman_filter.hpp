@@ -93,19 +93,23 @@ public:
                        std::vector<Eigen::MatrixXd>& gains) {
 	
         Eigen::MatrixXd S = C;
-        std::vector<Eigen::MatrixXd> As(A);
-        std::vector<Eigen::MatrixXd> Bs(B);
+        std::vector<Eigen::MatrixXd> As = A;
+        std::vector<Eigen::MatrixXd> Bs = B;
         std::reverse(As.begin(), As.end());
         std::reverse(Bs.begin(), Bs.end());
+	Eigen::MatrixXd L;
+	Eigen::MatrixXd A_tr;
+	Eigen::MatrixXd B_tr;
+	Eigen::MatrixXd S_old;
         for (size_t i = 0; i < horizon; i++) {
-            Eigen::MatrixXd A_tr = As[i].transpose();
-            Eigen::MatrixXd B_tr = Bs[i].transpose();
-            Eigen::MatrixXd L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
+            A_tr = As[i].transpose();
+            B_tr = Bs[i].transpose();
+            L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
             if (std::isnan(L(0, 0))) {
                 return false;
             }
             gains.push_back(L);
-            MatrixXd S_old = S;
+            S_old = S;
             S = C + A_tr * S_old * As[i] + A_tr * S_old * Bs[i] * L;
             if (std::isnan(S(0, 0))) {
                 return false;

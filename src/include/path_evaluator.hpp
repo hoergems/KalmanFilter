@@ -189,6 +189,7 @@ public:
         adjusted_trajectory.zs.push_back(x_estimated_t);
 
         std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);
+	std::vector<double> x_current = x_estimated_t;
         for (size_t i = 0; i < xs.size() - 1; i++) {
             std::vector<double> x_predicted = xs[i];
             VectorXd x_e_minus_p(x_predicted.size());
@@ -206,12 +207,13 @@ public:
             }
 
             std::vector<double> propagationResult;
-            env->getRobot()->propagateState(xs[i],
+            env->getRobot()->propagateState(x_current,
                                             u_vec,
                                             control_error,
                                             control_durations[i],
                                             options_->simulationStepSize,
                                             propagationResult);
+	    x_current = propagationResult;
             adjusted_trajectory.xs.push_back(propagationResult);
             adjusted_trajectory.us.push_back(u_vec);
             std::vector<double> z_elem;
