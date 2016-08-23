@@ -601,7 +601,7 @@ private:
         std::shared_ptr<shared::Robot> robot = env->getRobot();
 	unsigned long seed = std::time(nullptr);
         std::string distrType = "MultivariateNormal";	
-        std::shared_ptr<Eigen::EigenMultivariateNormal<double>> distr = env->createDistribution(mean_matr, 
+        std::shared_ptr<Eigen::Distribution<double>> distr = env->createDistribution(mean_matr, 
 												cov, 
 												seed,
 												distrType);
