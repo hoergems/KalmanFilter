@@ -142,7 +142,7 @@ public:
                                shared::Trajectory& trajectory,
                                std::vector<double>& x_estimated,
                                Eigen::MatrixXd& P_t,
-                               unsigned int& current_step,                               
+                               unsigned int& current_step,
                                std::shared_ptr<shared::PathEvaluationResult>& res) {
         std::vector<double> x_estimated_t = x_estimated;
         std::vector<std::vector<double>> xs;
@@ -187,10 +187,12 @@ public:
 
         shared::Trajectory adjusted_trajectory;
         adjusted_trajectory.xs.push_back(x_estimated_t);
-        adjusted_trajectory.zs.push_back(x_estimated_t);
+        std::vector<double> z_first;
+        env->getRobot()->transformToObservationSpace(x_estimated_t, z_first);
+        adjusted_trajectory.zs.push_back(z_first);
 
         std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);
-	std::vector<double> x_current = x_estimated_t;
+        std::vector<double> x_current = x_estimated_t;
         for (size_t i = 0; i < xs.size() - 1; i++) {
             std::vector<double> x_predicted = xs[i];
             VectorXd x_e_minus_p(x_predicted.size());
@@ -214,7 +216,7 @@ public:
                                             control_durations[i],
                                             options_->simulationStepSize,
                                             propagationResult);
-	    x_current = propagationResult;
+            x_current = propagationResult;
             adjusted_trajectory.xs.push_back(propagationResult);
             adjusted_trajectory.us.push_back(u_vec);
             std::vector<double> z_elem;
@@ -237,7 +239,11 @@ public:
                                           Ms[i],
                                           x_tilde_dash_t,
                                           P_t_p);
-            for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
+            /**for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
+                z_dash.push_back(0.0);
+            }*/
+
+            for (size_t j = 0; j < z_elem.size(); j++) {
                 z_dash.push_back(0.0);
             }
 
@@ -300,7 +306,7 @@ public:
         double path_reward = 0.0;
         unsigned int horizon_L = state_path.size();
         std::vector<Eigen::MatrixXd> Ls;
-        unsigned int hor = horizon_L - 1;	
+        unsigned int hor = horizon_L - 1;
         if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
             return 0.0;
         }
@@ -324,7 +330,7 @@ public:
             R_t_down;
         for (size_t i = 1; i < horizon_L; i++) {
             Eigen::MatrixXd P_hat_t;
-            kalman_filter_->computePredictedCovariance(As[i], P_t, Vs[i], Ms[i], P_hat_t);            
+            kalman_filter_->computePredictedCovariance(As[i], P_t, Vs[i], Ms[i], P_hat_t);
             Eigen::MatrixXd K_t;
 
             kalman_filter_->computeKalmanGain(Hs[i], P_hat_t, Ws[i], Ns[i], K_t);
@@ -349,11 +355,11 @@ public:
             G_t << Vs[i], G_u_r,
                 KHV, KW;
             /**if (print) {
-		cout << "F_t ";
-		cout << F_t;
-                cout << "G_t";
-                cout << G_t << endl;
-            }*/           
+            cout << "F_t ";
+              cout << F_t;
+                          cout << "G_t";
+                          cout << G_t << endl;
+                      }*/
             MatrixXd R_t_new  = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();
             R_t = R_t_new;
 	    
@@ -370,7 +376,7 @@ public:
                                    state_path[i],
                                    cov_state,
                                    expected_state_reward);
-            path_reward += std::pow(discount_factor_, current_step + i) * expected_state_reward;	    
+            path_reward += std::pow(discount_factor_, current_step + i) * expected_state_reward;
         }
 
         return path_reward;
@@ -396,7 +402,7 @@ public:
                               unsigned int& num_threads,
                               std::vector<std::shared_ptr<shared::RobotEnvironment>>& robot_environments,
                               std::vector<std::shared_ptr<shared::DynamicPathPlanner>>& dynamic_path_planners,
-                              std::shared_ptr<shared::PathEvaluationResult>& res,                              
+                              std::shared_ptr<shared::PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0,
                               double timeout = -1) {
         cout << "HFR: Planning with timeout: " << timeout << endl;
@@ -438,9 +444,9 @@ public:
 
         threads.clear();
         double best_objective = -1000000;
-        unsigned int queue_size = queue_ptr->size();        
+        unsigned int queue_size = queue_ptr->size();
         for (size_t i = 0; i < queue_size; i++) {
-            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();            
+            std::shared_ptr<shared::PathEvaluationResult> next_queue_elem = queue_ptr->front();
             if (next_queue_elem->path_objective > best_objective) {
                 best_objective = next_queue_elem->path_objective;
                 res = std::make_shared<shared::PathEvaluationResult>(*(next_queue_elem.get()));
@@ -496,7 +502,7 @@ public:
                     }
 
                     //Evaluate the solution
-                    boost::this_thread::interruption_point();                    
+                    boost::this_thread::interruption_point();
                     double objective = evaluatePath(env, xs, us, control_durations, P_t, current_step);
                     shared::Trajectory trajectory;
                     trajectory.xs = xs;
@@ -581,7 +587,7 @@ private:
             }
 
         }
-        expected_state_reward /= float(num_samples_);        
+        expected_state_reward /= float(num_samples_);
         return true;
     }
 
@@ -599,12 +605,12 @@ private:
         //cout << "cov " << cov << endl;
 
         std::shared_ptr<shared::Robot> robot = env->getRobot();
-	unsigned long seed = std::time(nullptr);
-        std::string distrType = "MultivariateNormal";	
-        std::shared_ptr<Eigen::Distribution<double>> distr = env->createDistribution(mean_matr, 
-												cov, 
-												seed,
-												distrType);
+        unsigned long seed = std::time(nullptr);
+        std::string distrType = "MultivariateNormal";
+        std::shared_ptr<Eigen::Distribution<double>> distr = env->createDistribution(mean_matr,
+                cov,
+                seed,
+                distrType);
         Eigen::MatrixXd samples_e = distr->samples(num_samples);
         if (std::isnan(samples_e(0, 0))) {
             return false;
