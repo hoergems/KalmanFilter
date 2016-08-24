@@ -70,7 +70,7 @@ public:
                               Eigen::MatrixXd& kalmanGain,
                               std::vector<double>& stateEstimate) {
         Eigen::VectorXd x_predicted_e = utils_kalman::toEigenVec(x_predicted);
-        Eigen::VectorXd z_dash_e = utils_kalman::toEigenVec(z_dash);
+        Eigen::VectorXd z_dash_e = utils_kalman::toEigenVec(z_dash);	
         Eigen::VectorXd stateEstimate_e = x_predicted_e + kalmanGain * z_dash_e;
         stateEstimate = utils_kalman::toStdVec(stateEstimate_e);
     }
