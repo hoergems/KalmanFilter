@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <memory>
 #include <signal.h>
+#include <frapu_core/core.hpp>
 
 namespace shared
 {
@@ -559,7 +560,8 @@ private:
         }
 
         bool collides = false;
-        std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
+	std::vector<frapu::ObstacleSharedPtr> obstacles;
+        //std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
         env->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
             // Check for collision
@@ -567,8 +569,8 @@ private:
             env->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);
             collides = false;
             for (size_t j = 0; j < obstacles.size(); j++) {
-                if (!obstacles[j]->getTerrain()->isTraversable()) {
-                    if (obstacles[j]->in_collision(collision_objects)) {
+                if (!obstacles[j]->getTerrain()->isTraversable()) {		    
+                    if (obstacles[j]->inCollision(collision_objects)) {
                         expected_state_reward -= illegal_move_penalty_;
                         collides = true;
                         break;

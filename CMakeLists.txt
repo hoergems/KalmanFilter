@@ -34,6 +34,17 @@ if(PKG_CONFIG_FOUND)
     link_directories(${EIGEN_LIBRARY_DIRS}) 
 endif()
 
+############################# LOAD FRAPU_CORE #############################
+if(PKG_CONFIG_FOUND)
+    pkg_check_modules(FRAPU_CORE frapu_core)
+    if(NOT FRAPU_CORE_FOUND)
+       message(FATAL_ERROR "FRAPU_CORE could not be found")
+    endif()
+    include_directories(${FRAPU_CORE_INCLUDE_DIRS})
+    link_directories(${FRAPU_CORE_LIBRARY_DIRS}) 
+    message("-- FRAPU_CORE LIB DIRS ${FRAPU_CORE_LIBRARY_DIRS}")    
+endif()
+
 ############################# LOAD ROBOTS #############################
 if(PKG_CONFIG_FOUND)    
     pkg_check_modules(ROBOTS robots)
