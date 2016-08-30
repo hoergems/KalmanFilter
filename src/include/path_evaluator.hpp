@@ -579,7 +579,8 @@ private:
             }
 
             if (!collides) {
-                if (env->getRobot()->isTerminal(state_samples[i])) {
+		frapu::RobotStateSharedPtr state = std::make_shared<frapu::VectorState>(state_samples[i]);
+                if (env->getRobot()->isTerminal(state)) {
                     expected_state_reward += terminal_reward_;
                 }
 
