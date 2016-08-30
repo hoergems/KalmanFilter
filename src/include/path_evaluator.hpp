@@ -196,7 +196,7 @@ public:
         std::vector<double> x_current = x_estimated_t;
         for (size_t i = 0; i < xs.size() - 1; i++) {
             std::vector<double> x_predicted = xs[i];
-            VectorXd x_e_minus_p(x_predicted.size());
+            Eigen::VectorXd x_e_minus_p(x_predicted.size());
             for (size_t j = 0; j < x_predicted.size(); j++) {
                 x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
             }
@@ -351,7 +351,7 @@ public:
 
             Eigen::MatrixXd KW(K_t * Ws[i]);
 
-            Eigen::MatrixXd G_u_r = MatrixXd::Zero(Vs[i].rows(), KW.cols());
+            Eigen::MatrixXd G_u_r = Eigen::MatrixXd::Zero(Vs[i].rows(), KW.cols());
             Eigen::MatrixXd G_t(Vs[i].rows() + KHV.rows(), Vs[i].cols() + G_u_r.cols());
             G_t << Vs[i], G_u_r,
                 KHV, KW;
@@ -361,7 +361,7 @@ public:
                           cout << "G_t";
                           cout << G_t << endl;
                       }*/
-            MatrixXd R_t_new  = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();
+            Eigen::MatrixXd R_t_new  = F_t * R_t * F_t.transpose() + G_t * Q_t * G_t.transpose();
             R_t = R_t_new;
 	    
             Eigen::MatrixXd Gamma_t_u_l = Eigen::MatrixXd::Identity(P_t.rows(), P_t.cols());
