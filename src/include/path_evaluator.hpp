@@ -84,8 +84,8 @@ public:
     }
 
     std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::shared_ptr<shared::RobotEnvironment>& env,
-            const std::vector<double>& state,
-            std::vector<double>& control,
+            const frapu::RobotStateSharedPtr& state,
+            frapu::ActionSharedPtr& control,
             double control_duration) const {
         std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
         std::vector<Eigen::MatrixXd> A_B_V_H_W;
@@ -141,11 +141,11 @@ public:
 
     bool adjustAndEvaluatePath(std::shared_ptr<shared::RobotEnvironment>& env,
                                shared::Trajectory& trajectory,
-                               std::vector<double>& x_estimated,
+                               frapu::RobotStateSharedPtr& x_estimated,
                                Eigen::MatrixXd& P_t,
                                unsigned int& current_step,
                                std::shared_ptr<shared::PathEvaluationResult>& res) {
-        std::vector<double> x_estimated_t = x_estimated;
+        std::vector<double> x_estimated_t = static_cast<frapu::VectorState *>(x_estimated.get())->asVector();
         std::vector<std::vector<double>> xs;
         std::vector<std::vector<double>> us;
         std::vector<double> control_durations;
