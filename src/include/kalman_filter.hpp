@@ -121,27 +121,28 @@ public:
     }
 
     void ekfPredictState(std::shared_ptr<shared::RobotEnvironment>& env,
-                         const std::vector<double>& x_estimated,
-                         std::vector<double>& u,
+                         const frapu::RobotStateSharedPtr& x_estimated,
+                         const frapu::ActionSharedPtr& u,
                          double& control_duration,
                          double& simulation_step_size,
                          Eigen::MatrixXd& A,
                          Eigen::MatrixXd& V,
                          Eigen::MatrixXd& M,
                          Eigen::MatrixXd& P_t,
-                         std::vector<double>& x_predicted,
+                         frapu::RobotStateSharedPtr& x_predicted,
                          Eigen::MatrixXd& P_predicted) {
-        x_predicted.clear();
+        x_predicted = nullptr;
         std::vector<double> control_error;
         for (size_t i = 0; i < env->getRobot()->getControlSpaceDimension(); i++) {
             control_error.push_back(0.0);
         }
+        
         env->getRobot()->propagateState(x_estimated,
                                         u,
                                         control_error,
                                         control_duration,
                                         simulation_step_size,
-                                        x_predicted);        
+                                        x_predicted);	
         computePredictedCovariance(A, P_t, V, M, P_predicted);
     }
 };
