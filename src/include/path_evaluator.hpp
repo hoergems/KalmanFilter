@@ -89,19 +89,18 @@ public:
             double control_duration) const {
         std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
         std::vector<Eigen::MatrixXd> A_B_V_H_W;
-        env->getRobot()->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
+        std::shared_ptr<shared::Robot> robot = env->getRobot();
+        robot->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[0]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[1]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[2]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[3]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[4]);
 
-        Eigen::MatrixXd M;
-        env->getRobot()->getStateCovarianceMatrix(M);
+        Eigen::MatrixXd M = robot->getProcessDistribution()->_covar;        
         A_B_V_H_W_M_N.push_back(M);
 
-        Eigen::MatrixXd N;
-        env->getRobot()->getObservationCovarianceMatrix(N);
+        Eigen::MatrixXd N = robot->getObservationDistribution()->_covar;        
         A_B_V_H_W_M_N.push_back(N);
 
         return A_B_V_H_W_M_N;
@@ -145,7 +144,8 @@ public:
                                Eigen::MatrixXd& P_t,
                                unsigned int& current_step,
                                std::shared_ptr<shared::PathEvaluationResult>& res) {
-        std::vector<double> x_estimated_t = static_cast<frapu::VectorState *>(x_estimated.get())->asVector();
+        std::shared_ptr<shared::Robot> robot = env->getRobot();
+        std::vector<double> x_estimatedVec = static_cast<frapu::VectorState*>(x_estimated.get())->asVector();
         std::vector<std::vector<double>> xs;
         std::vector<std::vector<double>> us;
         std::vector<double> control_durations;
@@ -186,41 +186,48 @@ public:
         }
 
         shared::Trajectory adjusted_trajectory;
-        adjusted_trajectory.xs.push_back(x_estimated_t);
+        adjusted_trajectory.xs.push_back(x_estimatedVec);
         std::vector<double> z_first;
-        env->getRobot()->transformToObservationSpace(x_estimated_t, z_first);
+        robot->transformToObservationSpace(x_estimated, z_first);
         adjusted_trajectory.zs.push_back(z_first);
 
-        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimated_t, xs[0]);
-        std::vector<double> x_current = x_estimated_t;
+        std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimatedVec, xs[0]);
+        frapu::RobotStateSharedPtr currentState = std::make_shared<frapu::VectorState>(x_estimatedVec);
         for (size_t i = 0; i < xs.size() - 1; i++) {
             std::vector<double> x_predicted = xs[i];
             Eigen::VectorXd x_e_minus_p(x_predicted.size());
             for (size_t j = 0; j < x_predicted.size(); j++) {
-                x_e_minus_p(j) = x_estimated_t[j] - x_predicted[j];
+                x_e_minus_p(j) = x_estimatedVec[j] - x_predicted[j];
             }
 
             Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);
             Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;
             std::vector<double> u_vec = utils_kalman::toStdVec(u);
-            env->getRobot()->enforceControlConstraints(u_vec);
-            std::vector<double> control_error;
+
+            frapu::ActionSharedPtr uAction = std::make_shared<frapu::VectorAction>(u_vec);
+            robot->getActionSpace()->getActionLimits()->enforceLimits(uAction);
+            u_vec = static_cast<frapu::VectorAction*>(uAction.get())->asVector();
+
+            std::vector<double> controlError;
             for (size_t j = 0; j < u_vec.size(); j++) {
-                control_error.push_back(0.0);
+                controlError.push_back(0.0);
             }
 
-            std::vector<double> propagationResult;
-            env->getRobot()->propagateState(x_current,
-                                            u_vec,
-                                            control_error,
-                                            control_durations[i],
-                                            options_->simulationStepSize,
-                                            propagationResult);
-            x_current = propagationResult;
-            adjusted_trajectory.xs.push_back(propagationResult);
+            frapu::RobotStateSharedPtr propagationResult;
+            robot->propagateState(currentState,
+                                  uAction,
+                                  controlError,
+                                  control_durations[i],
+                                  options_->simulationStepSize,
+                                  propagationResult);
+            currentState = propagationResult;
+            std::vector<double> currentStateVec =
+                static_cast<frapu::VectorState*>(propagationResult.get())->asVector();
+            adjusted_trajectory.xs.push_back(currentStateVec);
             adjusted_trajectory.us.push_back(u_vec);
+
             std::vector<double> z_elem;
-            env->getRobot()->transformToObservationSpace(propagationResult, z_elem);
+            robot->transformToObservationSpace(propagationResult, z_elem);
             adjusted_trajectory.zs.push_back(z_elem);
 
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
@@ -255,7 +262,7 @@ public:
                                          Ns[i],
                                          x_tilde,
                                          P_t_e);
-            x_estimated_t = utils_kalman::addVectors(x_tilde, xs[i + 1]);
+            x_estimatedVec = utils_kalman::addVectors(x_tilde, xs[i + 1]);
         }
 
         std::vector<double> ze;
@@ -491,7 +498,10 @@ public:
                                 u_elem.push_back(solution[i][state_space_dimension + j]);
                             }
                         }
-                        env->getRobot()->transformToObservationSpace(x_elem, z_elem);
+
+                        frapu::RobotStateSharedPtr xState =
+                            std::make_shared<frapu::VectorState>(x_elem);
+                        env->getRobot()->transformToObservationSpace(xState, z_elem);
 
 
                         control_durations.push_back(solution[i][2 * state_space_dimension + control_space_dimension]);
@@ -558,16 +568,18 @@ private:
         }
 
         bool collides = false;
-	std::vector<frapu::ObstacleSharedPtr> obstacles;
+        std::vector<frapu::ObstacleSharedPtr> obstacles;
         //std::vector<std::shared_ptr<shared::Obstacle>> obstacles;
         env->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
+            frapu::RobotStateSharedPtr state = std::make_shared<frapu::VectorState>(state_samples[i]);
+            
             // Check for collision
-            std::vector<std::shared_ptr<fcl::CollisionObject>> collision_objects;
-            env->getRobot()->createRobotCollisionObjects(state_samples[i], collision_objects);
+            std::vector<frapu::CollisionObjectSharedPtr> collision_objects;
+            env->getRobot()->createRobotCollisionObjects(state, collision_objects);
             collides = false;
             for (size_t j = 0; j < obstacles.size(); j++) {
-                if (!obstacles[j]->getTerrain()->isTraversable()) {		    
+                if (!obstacles[j]->getTerrain()->isTraversable()) {
                     if (obstacles[j]->inCollision(collision_objects)) {
                         expected_state_reward -= illegal_move_penalty_;
                         collides = true;
@@ -576,8 +588,7 @@ private:
                 }
             }
 
-            if (!collides) {
-		frapu::RobotStateSharedPtr state = std::make_shared<frapu::VectorState>(state_samples[i]);
+            if (!collides) {                
                 if (env->getRobot()->isTerminal(state)) {
                     expected_state_reward += terminal_reward_;
                 }
