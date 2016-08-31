@@ -97,10 +97,10 @@ public:
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[3]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[4]);
 
-        Eigen::MatrixXd M = robot->getProcessDistribution()->_covar;        
+        Eigen::MatrixXd M = robot->getProcessDistribution()->_covar;
         A_B_V_H_W_M_N.push_back(M);
 
-        Eigen::MatrixXd N = robot->getObservationDistribution()->_covar;        
+        Eigen::MatrixXd N = robot->getObservationDistribution()->_covar;
         A_B_V_H_W_M_N.push_back(N);
 
         return A_B_V_H_W_M_N;
@@ -187,9 +187,11 @@ public:
 
         shared::Trajectory adjusted_trajectory;
         adjusted_trajectory.xs.push_back(x_estimatedVec);
-        std::vector<double> z_first;
+        frapu::ObservationSharedPtr z_first;
         robot->transformToObservationSpace(x_estimated, z_first);
-        adjusted_trajectory.zs.push_back(z_first);
+        std::vector<double> z_firstVec =
+            static_cast<frapu::VectorObservation*>(z_first.get())->asVector();
+        adjusted_trajectory.zs.push_back(z_firstVec);
 
         std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimatedVec, xs[0]);
         frapu::RobotStateSharedPtr currentState = std::make_shared<frapu::VectorState>(x_estimatedVec);
@@ -226,9 +228,11 @@ public:
             adjusted_trajectory.xs.push_back(currentStateVec);
             adjusted_trajectory.us.push_back(u_vec);
 
-            std::vector<double> z_elem;
+            frapu::ObservationSharedPtr z_elem;
             robot->transformToObservationSpace(propagationResult, z_elem);
-            adjusted_trajectory.zs.push_back(z_elem);
+            std::vector<double> z_elemVec =
+                static_cast<frapu::VectorObservation*>(z_elem.get())->asVector();
+            adjusted_trajectory.zs.push_back(z_elemVec);
 
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
 
@@ -250,7 +254,7 @@ public:
                 z_dash.push_back(0.0);
             }*/
 
-            for (size_t j = 0; j < z_elem.size(); j++) {
+            for (size_t j = 0; j < z_elemVec.size(); j++) {
                 z_dash.push_back(0.0);
             }
 
@@ -490,8 +494,7 @@ public:
                     std::vector<double> control_durations;
                     for (size_t i = 0; i < solution.size(); i++) {
                         std::vector<double> x_elem;
-                        std::vector<double> u_elem;
-                        std::vector<double> z_elem;
+                        std::vector<double> u_elem;                        
                         for (size_t j = 0; j < state_space_dimension; j++) {
                             x_elem.push_back(solution[i][j]);
                             if (j < control_space_dimension) {
@@ -501,13 +504,16 @@ public:
 
                         frapu::RobotStateSharedPtr xState =
                             std::make_shared<frapu::VectorState>(x_elem);
+                        frapu::ObservationSharedPtr z_elem;
                         env->getRobot()->transformToObservationSpace(xState, z_elem);
+                        std::vector<double> z_elemVec =
+                            static_cast<frapu::VectorObservation*>(z_elem.get())->asVector();
 
 
                         control_durations.push_back(solution[i][2 * state_space_dimension + control_space_dimension]);
                         xs.push_back(x_elem);
                         us.push_back(u_elem);
-                        zs.push_back(z_elem);
+                        zs.push_back(z_elemVec);
                     }
 
                     //Evaluate the solution
@@ -573,7 +579,7 @@ private:
         env->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
             frapu::RobotStateSharedPtr state = std::make_shared<frapu::VectorState>(state_samples[i]);
-            
+
             // Check for collision
             std::vector<frapu::CollisionObjectSharedPtr> collision_objects;
             env->getRobot()->createRobotCollisionObjects(state, collision_objects);
@@ -588,7 +594,7 @@ private:
                 }
             }
 
-            if (!collides) {                
+            if (!collides) {
                 if (env->getRobot()->isTerminal(state)) {
                     expected_state_reward += terminal_reward_;
                 }
