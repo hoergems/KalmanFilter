@@ -495,8 +495,7 @@ public:
                     std::vector<double> control_durations;
                     for (size_t i = 0; i < solution.size(); i++) {
                         std::vector<double> x_elem;
-                        std::vector<double> u_elem;
-                        std::vector<double> z_elem;
+                        std::vector<double> u_elem;                        
                         for (size_t j = 0; j < state_space_dimension; j++) {
                             x_elem.push_back(solution[i][j]);
                             if (j < control_space_dimension) {
@@ -506,13 +505,16 @@ public:
 
                         frapu::RobotStateSharedPtr xState =
                             std::make_shared<frapu::VectorState>(x_elem);
+                        frapu::ObservationSharedPtr z_elem;
                         env->getRobot()->transformToObservationSpace(xState, z_elem);
+                        std::vector<double> z_elemVec =
+                            static_cast<frapu::VectorObservation*>(z_elem.get())->asVector();
 
 
                         control_durations.push_back(solution[i][2 * state_space_dimension + control_space_dimension]);
                         xs.push_back(x_elem);
                         us.push_back(u_elem);
-                        zs.push_back(z_elem);
+                        zs.push_back(z_elemVec);
                     }
 
                     //Evaluate the solution
