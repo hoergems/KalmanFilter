@@ -132,7 +132,8 @@ public:
                          Eigen::MatrixXd& P_predicted) {
         x_predicted = nullptr;
         std::vector<double> control_error;
-        for (size_t i = 0; i < env->getRobot()->getControlSpaceDimension(); i++) {
+	unsigned int controlSpaceDimension = env->getRobot()->getActionSpace()->getNumDimensions();
+        for (size_t i = 0; i < controlSpaceDimension; i++) {
             control_error.push_back(0.0);
         }
         

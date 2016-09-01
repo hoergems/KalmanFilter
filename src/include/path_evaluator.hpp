@@ -482,20 +482,20 @@ public:
                      unsigned int& current_step) {
         while (true) {
             try {
+		unsigned int state_space_dimension = env->getRobot()->getStateSpace()->getNumDimensions();                                         
+                unsigned int control_space_dimension = env->getRobot()->getActionSpace()->getNumDimensions();
                 dynamic_path_planner->reset();
                 std::vector<std::vector<double>> solution = dynamic_path_planner->solve(start_state,
                                               options_->rrtTimeout / 1000.0);
 
-                if (solution.size() != 0) {
-                    unsigned int state_space_dimension = env->getRobot()->getStateSpaceDimension();
-                    unsigned int control_space_dimension = env->getRobot()->getControlSpaceDimension();
+                if (solution.size() != 0) {                    
                     std::vector<std::vector<double>> xs;
                     std::vector<std::vector<double>> us;
                     std::vector<std::vector<double>> zs;
                     std::vector<double> control_durations;
                     for (size_t i = 0; i < solution.size(); i++) {
                         std::vector<double> x_elem;
-                        std::vector<double> u_elem;                        
+                        std::vector<double> u_elem;
                         for (size_t j = 0; j < state_space_dimension; j++) {
                             x_elem.push_back(solution[i][j]);
                             if (j < control_space_dimension) {
