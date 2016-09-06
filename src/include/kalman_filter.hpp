@@ -5,7 +5,7 @@
 #include "utils.hpp"
 #include <signal.h>
 
-namespace shared
+namespace frapu
 {
 
 class KalmanFilter
@@ -119,7 +119,7 @@ public:
 	return true;
     }
 
-    void ekfPredictState(std::shared_ptr<shared::RobotEnvironment>& env,
+    void ekfPredictState(std::shared_ptr<RobotEnvironment>& env,
                          const frapu::RobotStateSharedPtr& x_estimated,
                          const frapu::ActionSharedPtr& u,
                          double& control_duration,
