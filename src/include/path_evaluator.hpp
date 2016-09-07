@@ -9,7 +9,7 @@
 #include <robot_environment/Obstacle.hpp>
 #include "fcl/collision_object.h"
 #include <path_planner/dynamic_path_planner.hpp>
-#include <path_planner/trajectory.hpp>
+//#include <path_planner/trajectory.hpp>
 #include <unistd.h>
 #include <memory>
 #include <signal.h>
@@ -21,18 +21,19 @@ namespace frapu
 template<class RobotType, class OptionsType>
 std::shared_ptr<DynamicPathPlanner> makeDynamicPathPlanner2(std::shared_ptr<RobotEnvironment>& robot_environment,
         std::shared_ptr<OptionsType>& options)
-{    
+{
     std::shared_ptr<DynamicPathPlanner> dyn(new DynamicPathPlanner(false));
     dyn->setup(robot_environment, options->dynamicPlanner);
     std::vector<double> goal_area;
     robot_environment->getGoalArea(goal_area);
     std::vector<double> goal_position( {goal_area[0], goal_area[1], goal_area[2]});
     double goal_radius = goal_area[3];
-    std::vector<std::vector<double>> goal_states = robot_environment->getGoalStates();
+    frapu::RobotSharedPtr robot = robot_environment->getRobot();
+    std::vector<frapu::RobotStateSharedPtr> goalStates = robot->getGoalStates();    
     ompl::base::GoalPtr goal_region =
         frapu::makeRobotGoalRegion(dyn->getSpaceInformation(),
-                                    robot_environment,
-                                    goal_states);
+                                   robot,
+                                   goalStates);
 
     dyn->setGoal(goal_region);
     dyn->setControlSampler(options->controlSampler);
@@ -143,16 +144,16 @@ public:
                                Eigen::MatrixXd& P_t,
                                unsigned int& current_step,
                                std::shared_ptr<PathEvaluationResult>& res) {
-        std::shared_ptr<Robot> robot = env->getRobot();	
+        std::shared_ptr<Robot> robot = env->getRobot();
         std::vector<double> x_estimatedVec = static_cast<frapu::VectorState*>(x_estimated.get())->asVector();
         std::vector<std::vector<double>> xs;
         std::vector<std::vector<double>> us;
         std::vector<double> control_durations;
         for (size_t i = 1; i < trajectory.stateTrajectory.size(); i++) {
-	    std::vector<double> stateVec = static_cast<VectorState *>(trajectory.stateTrajectory[i].get())->asVector();
-	    std::vector<double> actionVec = static_cast<VectorAction *>(trajectory.actionTrajectory[i].get())->asVector();
+            std::vector<double> stateVec = static_cast<VectorState*>(trajectory.stateTrajectory[i].get())->asVector();
+            std::vector<double> actionVec = static_cast<VectorAction*>(trajectory.actionTrajectory[i].get())->asVector();
             xs.push_back(stateVec);
-            us.push_back(actionVec);	    
+            us.push_back(actionVec);
             control_durations.push_back(trajectory.durations[i]);
         }
 
@@ -187,7 +188,7 @@ public:
         }
 
         Trajectory adjusted_trajectory;
-	//frapu::VectorStateSharedPtr xEstimated = std::make_shared<>()
+        //frapu::VectorStateSharedPtr xEstimated = std::make_shared<>()
         adjusted_trajectory.stateTrajectory.push_back(x_estimated);
         frapu::ObservationSharedPtr z_first;
         robot->transformToObservationSpace(x_estimated, z_first);
@@ -272,24 +273,24 @@ public:
         }
 
         std::vector<double> ze;
-        for (size_t i = 0; i < static_cast<VectorAction *>(trajectory.actionTrajectory[0].get())->asVector().size(); i++) {
+        for (size_t i = 0; i < static_cast<VectorAction*>(trajectory.actionTrajectory[0].get())->asVector().size(); i++) {
             ze.push_back(0.0);
         }
-        
+
         frapu::ActionSharedPtr lastControl = std::make_shared<frapu::VectorAction>(ze);
 
         adjusted_trajectory.actionTrajectory.push_back(lastControl);
         adjusted_trajectory.durations = control_durations;
-	
-	std::vector<std::vector<double>> state_path(adjusted_trajectory.stateTrajectory.size());
+
+        std::vector<std::vector<double>> state_path(adjusted_trajectory.stateTrajectory.size());
         std::vector<std::vector<double>> control_path(adjusted_trajectory.actionTrajectory.size());
-	for (size_t i = 0; i < adjusted_trajectory.stateTrajectory.size(); i++) {
-	    std::vector<double> stateVec = static_cast<VectorState *>(adjusted_trajectory.stateTrajectory[i].get())->asVector();
-	    std::vector<double> controlVec = static_cast<VectorAction *>(adjusted_trajectory.actionTrajectory[i].get())->asVector();
-	    state_path[i] = stateVec;
-	    control_path[i] = controlVec;
-	}
-	
+        for (size_t i = 0; i < adjusted_trajectory.stateTrajectory.size(); i++) {
+            std::vector<double> stateVec = static_cast<VectorState*>(adjusted_trajectory.stateTrajectory[i].get())->asVector();
+            std::vector<double> controlVec = static_cast<VectorAction*>(adjusted_trajectory.actionTrajectory[i].get())->asVector();
+            state_path[i] = stateVec;
+            control_path[i] = controlVec;
+        }
+
         double objective = evaluatePath(env,
                                         state_path,
                                         control_path,
@@ -496,26 +497,26 @@ public:
                      unsigned int& current_step) {
         while (true) {
             try {
-		unsigned int state_space_dimension = env->getRobot()->getStateSpace()->getNumDimensions();                                         
+                unsigned int state_space_dimension = env->getRobot()->getStateSpace()->getNumDimensions();
                 unsigned int control_space_dimension = env->getRobot()->getActionSpace()->getNumDimensions();
                 dynamic_path_planner->reset();
-		frapu::Trajectory solution = dynamic_path_planner->solve(startState, options_->rrtTimeout / 1000.0);
+                frapu::Trajectory solution = dynamic_path_planner->solve(startState, options_->rrtTimeout / 1000.0);
                 if (solution.size() != 0) {
                     std::vector<std::vector<double>> xs(solution.stateTrajectory.size());
                     std::vector<std::vector<double>> us(solution.stateTrajectory.size());
                     std::vector<std::vector<double>> zs(solution.stateTrajectory.size());
-		    for (size_t i = 0; i < solution.stateTrajectory.size(); i++) {
-			xs[i] = static_cast<VectorState *>(solution.stateTrajectory[i].get())->asVector();
-			us[i] = static_cast<VectorAction *>(solution.actionTrajectory[i].get())->asVector();
-			frapu::ObservationSharedPtr observationState;
-			env->getRobot()->transformToObservationSpace(solution.stateTrajectory[i], observationState);
-			zs[i] = observationState;			
-		    }                    
+                    for (size_t i = 0; i < solution.stateTrajectory.size(); i++) {
+                        xs[i] = static_cast<VectorState*>(solution.stateTrajectory[i].get())->asVector();
+                        us[i] = static_cast<VectorAction*>(solution.actionTrajectory[i].get())->asVector();
+                        frapu::ObservationSharedPtr observationState;
+                        env->getRobot()->transformToObservationSpace(solution.stateTrajectory[i], observationState);
+                        zs[i] = observationState;
+                    }
 
                     //Evaluate the solution
                     boost::this_thread::interruption_point();
-                    double objective = evaluatePath(env, xs, us, solution.durations, P_t, current_step);                    
-                    
+                    double objective = evaluatePath(env, xs, us, solution.durations, P_t, current_step);
+
                     std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
                     result->trajectory = solution;
                     result->path_objective = objective;
@@ -566,8 +567,8 @@ private:
         }
 
         bool collides = false;
-        std::vector<frapu::ObstacleSharedPtr> obstacles;        
-        env->getObstacles(obstacles);
+        std::vector<frapu::ObstacleSharedPtr> obstacles;
+        env->getScene()->getObstacles(obstacles);
         for (size_t i = 0; i < num_samples_; i++) {
             frapu::RobotStateSharedPtr state = std::make_shared<frapu::VectorState>(state_samples[i]);
 
