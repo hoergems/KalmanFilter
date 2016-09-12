@@ -63,7 +63,7 @@ public:
             double control_duration) const {
         std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N;
         std::vector<Eigen::MatrixXd> A_B_V_H_W;
-        std::shared_ptr<Robot> robot = env->getRobot();
+        frapu::RobotSharedPtr robot = env->getRobot();
         robot->getLinearProcessMatrices(state, control, control_duration, A_B_V_H_W);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[0]);
         A_B_V_H_W_M_N.push_back(A_B_V_H_W[1]);
@@ -80,7 +80,7 @@ public:
         return A_B_V_H_W_M_N;
     }
 
-    void getLinearModelMatrices(std::shared_ptr<RobotEnvironment>& env,
+    void getLinearModelMatrices(frapu::RobotEnvironmentSharedPtr& env,
                                 std::vector<std::vector<double>>& state_path,
                                 std::vector<std::vector<double>>& control_path,
                                 std::vector<double>& control_durations,
@@ -93,7 +93,18 @@ public:
                                 std::vector<Eigen::MatrixXd>& Ns) {
         //std::vector<Eigen::MatrixXd> A_B_V_H_W;
         for (size_t i = 0; i < state_path.size(); i++) {
-            std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(env, state_path[i], control_path[i], control_durations[i]);
+	    frapu::RobotStateSharedPtr state(new frapu::VectorState(state_path[i]));
+	    frapu::ActionSharedPtr action(new frapu::VectorAction(control_path[i]));
+	    if (!state) {
+		frapu::ERROR("PathEvaluator: getLinearModelMatrices: state is null!");
+	    }
+	    if (!action) {
+		frapu::ERROR("PathEvaluator: getLinearModelMatrices: action is null!");
+	    }
+	    if (!env) {
+		frapu::ERROR("PathEvaluator: getLinearModelMatrices: env is null!");
+	    }
+            std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(env, state, action, control_durations[i]);
             As.push_back(A_B_V_H_W_M_N[0]);
             Bs.push_back(A_B_V_H_W_M_N[1]);
             Vs.push_back(A_B_V_H_W_M_N[2]);
@@ -396,15 +407,15 @@ public:
         num_samples_ = num_samples;
     }
 
-    bool planAndEvaluatePaths(const std::vector<double>& start_state,
+    bool planAndEvaluatePaths(const frapu::RobotStateSharedPtr& start_state,
                               Eigen::MatrixXd& P_t,
                               unsigned int& current_step,
                               unsigned int& num_threads,
                               std::vector<std::shared_ptr<RobotEnvironment>>& robot_environments,
-                              std::vector<std::shared_ptr<DynamicPathPlanner>>& dynamic_path_planners,
+                              std::vector<frapu::PathPlannerSharedPtr>& dynamic_path_planners,
                               std::shared_ptr<PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0,
-                              double timeout = -1) {
+                              double timeout = -1) {	
         cout << "HFR: Planning with timeout: " << timeout << endl;
         std::shared_ptr<std::queue<std::shared_ptr<PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<PathEvaluationResult>>);
         std::vector<boost::thread*> threads;
@@ -465,34 +476,38 @@ public:
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<PathEvaluationResult>>>& queue_ptr,
                      std::shared_ptr<RobotEnvironment>& env,
-                     std::shared_ptr<DynamicPathPlanner>& dynamic_path_planner,
+                     frapu::PathPlannerSharedPtr& dynamic_path_planner,
                      const frapu::RobotStateSharedPtr& startState,
                      Eigen::MatrixXd& P_t,
                      unsigned int& current_step) {
         while (true) {
+	    frapu::DynamicPathPlanner *dynamicPathPlanner = static_cast<frapu::DynamicPathPlanner *>(dynamic_path_planner.get());
             try {
                 unsigned int state_space_dimension = env->getRobot()->getStateSpace()->getNumDimensions();
                 unsigned int control_space_dimension = env->getRobot()->getActionSpace()->getNumDimensions();
-                dynamic_path_planner->reset();
-                frapu::Trajectory solution = dynamic_path_planner->solve(startState, options_->rrtTimeout / 1000.0);
-                if (solution.size() != 0) {
-                    std::vector<std::vector<double>> xs(solution.stateTrajectory.size());
-                    std::vector<std::vector<double>> us(solution.stateTrajectory.size());
-                    std::vector<std::vector<double>> zs(solution.stateTrajectory.size());
-                    for (size_t i = 0; i < solution.stateTrajectory.size(); i++) {
-                        xs[i] = static_cast<VectorState*>(solution.stateTrajectory[i].get())->asVector();
-                        us[i] = static_cast<VectorAction*>(solution.actionTrajectory[i].get())->asVector();
+                dynamicPathPlanner->reset();
+                frapu::TrajectorySharedPtr solution = dynamicPathPlanner->solve(startState, options_->rrtTimeout / 1000.0);
+                if (solution->size() != 0) {
+                    std::vector<std::vector<double>> xs(solution->stateTrajectory.size());
+                    std::vector<std::vector<double>> us(solution->stateTrajectory.size());
+                    std::vector<std::vector<double>> zs(solution->stateTrajectory.size());
+                    for (size_t i = 0; i < solution->stateTrajectory.size(); i++) {
+                        xs[i] = static_cast<VectorState*>(solution->stateTrajectory[i].get())->asVector();
+                        us[i] = static_cast<VectorAction*>(solution->actionTrajectory[i].get())->asVector();
                         frapu::ObservationSharedPtr observationState;
-                        env->getRobot()->transformToObservationSpace(solution.stateTrajectory[i], observationState);
-                        zs[i] = observationState;
+                        env->getRobot()->transformToObservationSpace(solution->stateTrajectory[i], observationState);
+                        zs[i] = static_cast<frapu::VectorObservation *>(observationState.get())->asVector();
                     }
 
                     //Evaluate the solution
                     boost::this_thread::interruption_point();
-                    double objective = evaluatePath(env, xs, us, solution.durations, P_t, current_step);
+		    if (solution->durations.size() == 0) {
+			frapu::ERROR("durations is 0!!!");
+		    }
+                    double objective = evaluatePath(env, xs, us, solution->durations, P_t, current_step);
 
                     std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
-                    result->trajectory = solution;
+                    result->trajectory = *(solution.get());
                     result->path_objective = objective;
                     boost::this_thread::interruption_point();
                     mtx_.lock();
@@ -503,7 +518,7 @@ public:
             }
 
             catch (boost::thread_interrupted&) {
-                dynamic_path_planner->reset();
+                dynamicPathPlanner->reset();
                 return true;
             }
         }
