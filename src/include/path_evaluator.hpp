@@ -18,32 +18,6 @@
 namespace frapu
 {
 
-template<class RobotType, class OptionsType>
-std::shared_ptr<DynamicPathPlanner> makeDynamicPathPlanner2(std::shared_ptr<RobotEnvironment>& robot_environment,
-        std::shared_ptr<OptionsType>& options)
-{
-    std::shared_ptr<DynamicPathPlanner> dyn(new DynamicPathPlanner(false));
-    dyn->setup(robot_environment, options->dynamicPlanner);
-    std::vector<double> goal_area;
-    robot_environment->getGoalArea(goal_area);
-    std::vector<double> goal_position( {goal_area[0], goal_area[1], goal_area[2]});
-    double goal_radius = goal_area[3];
-    frapu::RobotSharedPtr robot = robot_environment->getRobot();
-    std::vector<frapu::RobotStateSharedPtr> goalStates = robot->getGoalStates();    
-    ompl::base::GoalPtr goal_region =
-        frapu::makeRobotGoalRegion(dyn->getSpaceInformation(),
-                                   robot,
-                                   goalStates);
-
-    dyn->setGoal(goal_region);
-    dyn->setControlSampler(options->controlSampler);
-    dyn->addIntermediateStates(true);
-    dyn->setNumControlSamples(options->numControlSamples);
-    dyn->setRRTGoalBias(options->rrtGoalBias);
-    dyn->setMinMaxControlDuration(options->minMaxControlDuration);
-    return dyn;
-}
-
 class PathEvaluationResult
 {
 public:
