@@ -57,7 +57,7 @@ public:
 
     }
 
-    std::vector<Eigen::MatrixXd> getLinearModelMatricesState(std::shared_ptr<RobotEnvironment>& env,
+    std::vector<Eigen::MatrixXd> getLinearModelMatricesState(frapu::RobotEnvironmentSharedPtr& env,
             const frapu::RobotStateSharedPtr& state,
             frapu::ActionSharedPtr& control,
             double control_duration) const {
@@ -612,6 +612,7 @@ private:
                 distrType);
         Eigen::MatrixXd samples_e = distr->samples(num_samples);
         if (std::isnan(samples_e(0, 0))) {
+	    frapu::ERROR("PathEvaluator: sampleValidStates: is Nan");
             return false;
         }
         for (size_t i = 0; i < num_samples; i++) {
