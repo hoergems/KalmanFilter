@@ -100,18 +100,19 @@ public:
 	Eigen::MatrixXd A_tr;
 	Eigen::MatrixXd B_tr;
 	Eigen::MatrixXd S_old;
+	gains = std::vector<Eigen::MatrixXd>(horizon);
         for (size_t i = 0; i < horizon; i++) {
             A_tr = As[i].transpose();
             B_tr = Bs[i].transpose();
             L = -(B_tr * S * Bs[i] + D).inverse() * B_tr * S * As[i];
             if (std::isnan(L(0, 0))) {
-                return false;
+                frapu::ERROR("KalmanFilter: computeLGains(): L is nan");
             }
-            gains.push_back(L);
+            gains[i] = L;
             S_old = S;
             S = C + A_tr * S_old * As[i] + A_tr * S_old * Bs[i] * L;
             if (std::isnan(S(0, 0))) {
-                return false;
+                frapu::ERROR("KalmanFilter: computeLGains(): S is nan");
             }
         }
         

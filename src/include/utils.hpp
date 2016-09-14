@@ -10,18 +10,18 @@ Eigen::VectorXd toEigenVec(std::vector<double> &vec) {
 }
 
 std::vector<double> addVectors(std::vector<double> &vec1, std::vector<double> &vec2) {
-	std::vector<double> res;
+	std::vector<double> res(vec1.size());
 	for (size_t i = 0; i < vec1.size(); i++) {
-		res.push_back(vec1[i] + vec2[i]);
+		res[i] = vec1[i] + vec2[i];
 	}
 	
 	return res;
 }
 
 std::vector<double> subtractVectors(std::vector<double> &vec1, std::vector<double> &vec2) {
-	std::vector<double> res;
+	std::vector<double> res(vec1.size());
 	for (size_t i = 0; i < vec1.size(); i++) {
-		res.push_back(vec1[i] - vec2[i]);
+		res[i] = vec1[i] - vec2[i];
 	}
 	
 	return res;

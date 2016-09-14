@@ -37,7 +37,7 @@ public:
 
     double path_objective;
 
-    long numPlannedTrajectories;
+    long numPlannedTrajectories;    
 };
 
 template<class RobotType, class OptionsType>
@@ -93,17 +93,17 @@ public:
                                 std::vector<Eigen::MatrixXd>& Ns) {
         //std::vector<Eigen::MatrixXd> A_B_V_H_W;
         for (size_t i = 0; i < state_path.size(); i++) {
-	    frapu::RobotStateSharedPtr state(new frapu::VectorState(state_path[i]));
-	    frapu::ActionSharedPtr action(new frapu::VectorAction(control_path[i]));
-	    if (!state) {
-		frapu::ERROR("PathEvaluator: getLinearModelMatrices: state is null!");
-	    }
-	    if (!action) {
-		frapu::ERROR("PathEvaluator: getLinearModelMatrices: action is null!");
-	    }
-	    if (!env) {
-		frapu::ERROR("PathEvaluator: getLinearModelMatrices: env is null!");
-	    }
+            frapu::RobotStateSharedPtr state(new frapu::VectorState(state_path[i]));
+            frapu::ActionSharedPtr action(new frapu::VectorAction(control_path[i]));
+            if (!state) {
+                frapu::ERROR("PathEvaluator: getLinearModelMatrices: state is null!");
+            }
+            if (!action) {
+                frapu::ERROR("PathEvaluator: getLinearModelMatrices: action is null!");
+            }
+            if (!env) {
+                frapu::ERROR("PathEvaluator: getLinearModelMatrices: env is null!");
+            }
             std::vector<Eigen::MatrixXd> A_B_V_H_W_M_N = getLinearModelMatricesState(env, state, action, control_durations[i]);
             As.push_back(A_B_V_H_W_M_N[0]);
             Bs.push_back(A_B_V_H_W_M_N[1]);
@@ -165,20 +165,17 @@ public:
                                Ms,
                                Hs,
                                Ws,
-                               Ns);
+                               Ns);	
         std::vector<Eigen::MatrixXd> Ls;
         unsigned int hor = xs.size() - 1;
         if (!kalman_filter_->computeLGains(As, Bs, C_, D_, hor, Ls)) {
             return false;
         }
 
-        Trajectory adjusted_trajectory;
-        //frapu::VectorStateSharedPtr xEstimated = std::make_shared<>()
+        Trajectory adjusted_trajectory;        
         adjusted_trajectory.stateTrajectory.push_back(x_estimated);
         frapu::ObservationSharedPtr z_first;
-        robot->transformToObservationSpace(x_estimated, z_first);
-        /**std::vector<double> z_firstVec =
-            static_cast<frapu::VectorObservation*>(z_first.get())->asVector();*/
+        robot->transformToObservationSpace(x_estimated, z_first);        
         adjusted_trajectory.observationTrajectory.push_back(z_first);
 
         std::vector<double> x_tilde = utils_kalman::subtractVectors(x_estimatedVec, xs[0]);
@@ -188,16 +185,14 @@ public:
             Eigen::VectorXd x_e_minus_p(x_predicted.size());
             for (size_t j = 0; j < x_predicted.size(); j++) {
                 x_e_minus_p(j) = x_estimatedVec[j] - x_predicted[j];
-            }
-
+            }            
+            
             Eigen::VectorXd us_i = utils_kalman::toEigenVec(us[i]);
             Eigen::VectorXd u = Ls[i] * x_e_minus_p + us_i;
             std::vector<double> u_vec = utils_kalman::toStdVec(u);
-
             frapu::ActionSharedPtr uAction = std::make_shared<frapu::VectorAction>(u_vec);
             robot->getActionSpace()->getActionLimits()->enforceLimits(uAction);
             u_vec = static_cast<frapu::VectorAction*>(uAction.get())->asVector();
-
             std::vector<double> controlError;
             for (size_t j = 0; j < u_vec.size(); j++) {
                 controlError.push_back(0.0);
@@ -210,23 +205,18 @@ public:
                                   control_durations[i],
                                   options_->simulationStepSize,
                                   propagationResult);
-            currentState = propagationResult;
-            /**std::vector<double> currentStateVec =
-                static_cast<frapu::VectorState*>(propagationResult.get())->asVector();*/
+            currentState = propagationResult;            
             adjusted_trajectory.stateTrajectory.push_back(propagationResult);
             adjusted_trajectory.actionTrajectory.push_back(uAction);
-
             frapu::ObservationSharedPtr z_elem;
             robot->transformToObservationSpace(propagationResult, z_elem);
             std::vector<double> z_elemVec =
                 static_cast<frapu::VectorObservation*>(z_elem.get())->asVector();
             adjusted_trajectory.observationTrajectory.push_back(z_elem);
-
             std::vector<double> u_dash = utils_kalman::subtractVectors(u_vec, us[i]);
 
             //Kalman prediction and update
-            std::vector<double> x_tilde_dash_t;
-            //std::vector<double> x_tilde_estimated;
+            std::vector<double> x_tilde_dash_t;            
             std::vector<double> z_dash;
             Eigen::MatrixXd P_t_p;
             kalman_filter_->kalmanPredict(x_tilde,
@@ -238,10 +228,6 @@ public:
                                           Ms[i],
                                           x_tilde_dash_t,
                                           P_t_p);
-            /**for (size_t j = 0; j < x_tilde_dash_t.size(); j++) {
-                z_dash.push_back(0.0);
-            }*/
-
             for (size_t j = 0; j < z_elemVec.size(); j++) {
                 z_dash.push_back(0.0);
             }
@@ -253,7 +239,7 @@ public:
                                          Ws[i],
                                          Ns[i],
                                          x_tilde,
-                                         P_t_e);
+                                         P_t_e);	    
             x_estimatedVec = utils_kalman::addVectors(x_tilde, xs[i + 1]);
         }
 
@@ -274,24 +260,25 @@ public:
             std::vector<double> controlVec = static_cast<VectorAction*>(adjusted_trajectory.actionTrajectory[i].get())->asVector();
             state_path[i] = stateVec;
             control_path[i] = controlVec;
-        }
-
+        }        
+        
         double objective = evaluatePath(env,
                                         state_path,
                                         control_path,
-                                        adjusted_trajectory.durations,
+                                        adjusted_trajectory.durations,					
                                         P_t,
                                         current_step);
         res = std::make_shared<PathEvaluationResult>();
         res->trajectory = adjusted_trajectory;
         res->path_objective = objective;
+	
         return true;
     }
 
     double evaluatePath(std::shared_ptr<RobotEnvironment>& env,
                         std::vector<std::vector<double>>& state_path,
                         std::vector<std::vector<double>>& control_path,
-                        std::vector<double>& control_durations,
+                        std::vector<double>& control_durations,                        
                         Eigen::MatrixXd& P_t_in,
                         unsigned int& current_step) {
         Eigen::MatrixXd P_t(P_t_in);
@@ -382,11 +369,11 @@ public:
                     Gamma_t_l_l, Ls[i - 1];
             Eigen::MatrixXd Cov = Gamma_t * R_t * Gamma_t.transpose();
             Eigen::MatrixXd cov_state(Cov.block(0, 0, P_t.rows(), P_t.cols()));
-            double expected_state_reward = 0.0;
+            double expected_state_reward = 0.0;            
             getExpectedStateReward(env,
                                    state_path[i],
                                    cov_state,
-                                   expected_state_reward);
+                                   expected_state_reward);	    	    
             path_reward += std::pow(discount_factor_, current_step + i) * expected_state_reward;
         }
 
@@ -415,7 +402,7 @@ public:
                               std::vector<frapu::PathPlannerSharedPtr>& dynamic_path_planners,
                               std::shared_ptr<PathEvaluationResult>& res,
                               unsigned int minNumPaths = 0,
-                              double timeout = -1) {	
+                              double timeout = -1) {
         cout << "HFR: Planning with timeout: " << timeout << endl;
         std::shared_ptr<std::queue<std::shared_ptr<PathEvaluationResult>>> queue_ptr(new std::queue<std::shared_ptr<PathEvaluationResult>>);
         std::vector<boost::thread*> threads;
@@ -461,8 +448,7 @@ public:
             if (next_queue_elem->path_objective > best_objective) {
                 best_objective = next_queue_elem->path_objective;
                 res = std::make_shared<PathEvaluationResult>(*(next_queue_elem.get()));
-                res->path_objective = next_queue_elem->path_objective;
-
+                res->path_objective = next_queue_elem->path_objective;		
             }
 
             queue_ptr->pop();
@@ -471,7 +457,6 @@ public:
         if (res) {
             res->numPlannedTrajectories = queue_size;
         }
-
     }
 
     bool eval_thread(std::shared_ptr<std::queue<std::shared_ptr<PathEvaluationResult>>>& queue_ptr,
@@ -481,7 +466,7 @@ public:
                      Eigen::MatrixXd& P_t,
                      unsigned int& current_step) {
         while (true) {
-	    frapu::DynamicPathPlanner *dynamicPathPlanner = static_cast<frapu::DynamicPathPlanner *>(dynamic_path_planner.get());
+            frapu::DynamicPathPlanner* dynamicPathPlanner = static_cast<frapu::DynamicPathPlanner*>(dynamic_path_planner.get());
             try {
                 unsigned int state_space_dimension = env->getRobot()->getStateSpace()->getNumDimensions();
                 unsigned int control_space_dimension = env->getRobot()->getActionSpace()->getNumDimensions();
@@ -496,15 +481,17 @@ public:
                         us[i] = static_cast<VectorAction*>(solution->actionTrajectory[i].get())->asVector();
                         frapu::ObservationSharedPtr observationState;
                         env->getRobot()->transformToObservationSpace(solution->stateTrajectory[i], observationState);
-                        zs[i] = static_cast<frapu::VectorObservation *>(observationState.get())->asVector();
+                        zs[i] = static_cast<frapu::VectorObservation*>(observationState.get())->asVector();
                     }
 
                     //Evaluate the solution
                     boost::this_thread::interruption_point();
-		    if (solution->durations.size() == 0) {
-			frapu::ERROR("durations is 0!!!");
-		    }
-                    double objective = evaluatePath(env, xs, us, solution->durations, P_t, current_step);
+                    if (solution->durations.size() == 0) {
+                        frapu::ERROR("durations is 0!!!");
+                    }
+                    
+                    
+                    double objective = evaluatePath(env, xs, us, solution->durations, P_t, current_step);		    
 
                     std::shared_ptr<PathEvaluationResult> result(new PathEvaluationResult());
                     result->trajectory = *(solution.get());
@@ -549,6 +536,7 @@ private:
                                 std::vector<double>& state,
                                 Eigen::MatrixXd& cov_state,
                                 double& expected_state_reward) {
+        //sleep(1);
         std::vector<std::vector<double>> state_samples;
         if (!sampleValidStates(env, state, cov_state, num_samples_, state_samples)) {
             cout << "RETURN FALSE" << endl;
@@ -576,7 +564,7 @@ private:
             }
 
             if (!collides) {
-                if (env->getRobot()->isTerminal(state)) {
+                if (env->getRobot()->isTerminal(state)) {		    
                     expected_state_reward += terminal_reward_;
                 }
 
@@ -612,7 +600,7 @@ private:
                 distrType);
         Eigen::MatrixXd samples_e = distr->samples(num_samples);
         if (std::isnan(samples_e(0, 0))) {
-	    frapu::ERROR("PathEvaluator: sampleValidStates: is Nan");
+            frapu::ERROR("PathEvaluator: sampleValidStates: is Nan");
             return false;
         }
         for (size_t i = 0; i < num_samples; i++) {
