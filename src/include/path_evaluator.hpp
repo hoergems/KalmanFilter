@@ -592,11 +592,10 @@ private:
         //cout << "cov " << cov << endl;
 
         std::shared_ptr<Robot> robot = env->getRobot();
-        unsigned long seed = std::time(nullptr);
+        //unsigned long seed = std::time(nullptr);
         std::string distrType = "MultivariateNormal";
         std::shared_ptr<Eigen::Distribution<double>> distr = env->createDistribution(mean_matr,
-                cov,
-                seed,
+                cov,                
                 distrType);
         Eigen::MatrixXd samples_e = distr->samples(num_samples);
         if (std::isnan(samples_e(0, 0))) {
