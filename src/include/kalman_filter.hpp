@@ -87,10 +87,10 @@ public:
 
     bool computeLGains(std::vector<Eigen::MatrixXd>& A,
                        std::vector<Eigen::MatrixXd>& B,
-                       Eigen::MatrixXd& C,
-                       Eigen::MatrixXd& D,
+                       const Eigen::MatrixXd& C,
+                       const Eigen::MatrixXd& D,
                        unsigned int& horizon,
-                       std::vector<Eigen::MatrixXd>& gains) {
+                       std::vector<Eigen::MatrixXd>& gains) const {
         Eigen::MatrixXd S = C;
         std::vector<Eigen::MatrixXd> As = A;
         std::vector<Eigen::MatrixXd> Bs = B;
