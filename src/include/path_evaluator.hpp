@@ -507,6 +507,7 @@ public:
                     boost::this_thread::interruption_point();
                     mtx_.lock();
                     queue_ptr->push(result);
+		    cout << "size so far: " << queue_ptr->size() << endl;
                     mtx_.unlock();
                     boost::this_thread::interruption_point();
                 }
